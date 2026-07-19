@@ -1,7 +1,7 @@
 <?php
 $host = "localhost";
 $user = "root";
-$password = "";
+$password = "votre_mot_de_passe";
 $dbname = "safegp";
 
 $conn = new mysqli($host, $user, $password, $dbname);
