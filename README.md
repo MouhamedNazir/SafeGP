@@ -2,13 +2,15 @@
 
 Plateforme web de mise en relation entre **GP** (voyageurs/transporteurs) et **expéditeurs de colis** sur les trajets Maroc ↔ Sénégal.
 
-## 🎯 Principe
+🔗 **Démo en ligne** : [safegp.free.nf](http://safegp.free.nf)
+
+##  Principe
 
 - Un **GP** publie un trajet (ville de départ, ville d'arrivée, dates, prix au kilo, contact)
 - Un **expéditeur** recherche un trajet disponible par ville de départ / arrivée
 - Les deux parties échangent via une messagerie intégrée pour finaliser l'envoi
 
-## ✨ Fonctionnalités
+##  Fonctionnalités
 
 - Inscription / connexion des utilisateurs
 - Profils utilisateurs avec photo
@@ -17,7 +19,7 @@ Plateforme web de mise en relation entre **GP** (voyageurs/transporteurs) et **e
 - Messagerie interne entre utilisateurs
 - Back-office admin avec gestion des rôles (vérification côté serveur)
 
-## 📸 Aperçu
+##  Aperçu
 
 ### Page d'accueil
 ![Accueil](screenshots/accueil.png)
@@ -43,13 +45,13 @@ Plateforme web de mise en relation entre **GP** (voyageurs/transporteurs) et **e
 
 
 
-## 🛠️ Stack technique
+##  Stack technique
 
 - **Backend** : PHP (mysqli, requêtes préparées)
 - **Base de données** : MySQL
 - **Frontend** : HTML, CSS, JavaScript
 
-## 🚀 Installation locale
+##  Installation locale (Optionnel bien sûr)
 
 1. Cloner le dépôt
    ```bash
@@ -59,10 +61,10 @@ Plateforme web de mise en relation entre **GP** (voyageurs/transporteurs) et **e
 3. Copier `config.example.php` en `config.php` et renseigner vos identifiants de connexion à la base
 4. Lancer le projet sur un serveur local (ex. XAMPP/WAMP) et ouvrir `index.php`
 
-## 📌 Statut
+##  Statut
 
 Projet personnel en cours de développement — de nouvelles fonctionnalités sont à venir.
 
-## 👤 Auteur
+##  Auteur
 
 Mouhamed Nazirou Ndiaye — [LinkedIn](https://www.linkedin.com/in/mouhamed-nazirou-ndiaye) · [GitHub](https://github.com/MouhamedNazir)
