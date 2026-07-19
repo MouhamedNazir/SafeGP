@@ -1,0 +1,10 @@
+# Config avec identifiants (ne jamais committer)
+config.php
+
+# Photos uploadées par les utilisateurs (données, pas du code)
+uploads/*
+!uploads/.gitkeep
+
+# Fichiers système
+.DS_Store
+Thumbs.db
