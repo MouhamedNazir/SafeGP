@@ -17,6 +17,32 @@ Plateforme web de mise en relation entre **GP** (voyageurs/transporteurs) et **e
 - Messagerie interne entre utilisateurs
 - Back-office admin avec gestion des rôles (vérification côté serveur)
 
+## 📸 Aperçu
+
+### Page d'accueil
+![Accueil](screenshots/accueil.png)
+
+### Transporteurs disponibles
+![GPs disponibles](screenshots/gps-disponibles.png)
+
+### Recherche de trajets
+![Résultats de recherche](screenshots/recherche-resultats.png)
+
+### Connexion
+![Connexion](screenshots/connexion.png)
+
+### Publication d'un trajet
+![Publier un trajet](screenshots/publier-trajet.png)
+
+### Messagerie
+![Messagerie](screenshots/messagerie.png)
+![Conversation](screenshots/messagerie-conversation.png)
+
+### Profil utilisateur
+![Mon profil](screenshots/mon-profil.png)
+
+
+
 ## 🛠️ Stack technique
 
 - **Backend** : PHP (mysqli, requêtes préparées)
