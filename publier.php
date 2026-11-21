@@ -1,6 +1,5 @@
 <?php
-include 'config.php';
-include 'init.php';
+require_once 'init.php';
 
 if (!isset($_SESSION['user_id'])) {
     header("Location: connexion.php");
@@ -8,7 +7,7 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 $user_id = (int)$_SESSION['user_id'];
-$success = false;
+$success = isset($_GET['publie']);
 $erreur = "";
 $t = [];
 $contacts_valeurs = [];
@@ -17,11 +16,16 @@ $contacts_valeurs = [];
 $quota = quota_publication($conn, $user_id);
 $limite_atteinte = !$quota['illimite'] && $quota['restantes'] <= 0;
 
+// E-mail à confirmer avant de publier (quand l'envoi d'e-mails est actif)
+$email_a_confirmer = $nav_email_a_confirmer;
+
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $t = trajet_depuis_post();
     $contacts_valeurs = contacts_depuis_post($erreur);
 
-    if ($limite_atteinte) {
+    if ($email_a_confirmer) {
+        $erreur = "Confirme d'abord ton adresse e-mail pour publier un trajet.";
+    } elseif ($limite_atteinte) {
         $erreur = "Tu as atteint la limite de " . FREEMIUM_LIMITE_MOIS . " publications ce mois-ci avec le compte gratuit.";
     } elseif (!$erreur) {
         $erreur = trajet_valider($t, $contacts_valeurs);
@@ -31,14 +35,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     if (!$erreur) {
         $stmt = $conn->prepare("INSERT INTO trajets
             (depart, arrivee, date_depart, heure_depart, date_arrivee, heure_arrivee, date_limite_depot,
-             prix_kilo, kilos_total, kilos_restants, telephone, commentaire,
+             prix_kilo, devise, kilos_total, kilos_restants, telephone, commentaire,
              point_depot, horaires_depot, point_reception, horaires_reception,
              pour_autrui, voyageur_nom, user_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-        $stmt->bind_param("sssssssdddssssssisi",
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt->bind_param("sssssssdsddssssssisi",
             $t['depart'], $t['arrivee'], $t['date_depart'], $t['heure_depart'],
             $t['date_arrivee'], $t['heure_arrivee'], $t['date_limite_depot'],
-            $t['prix_kilo'], $t['kilos_total'], $t['kilos_restants'], $t['telephone'], $t['commentaire'],
+            $t['prix_kilo'], $t['devise'], $t['kilos_total'], $t['kilos_restants'], $t['telephone'], $t['commentaire'],
             $t['point_depot'], $t['horaires_depot'], $t['point_reception'], $t['horaires_reception'],
             $t['pour_autrui'], $t['voyageur_nom'], $user_id);
 
@@ -47,11 +51,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             if ($t['pour_autrui']) {
                 contacts_enregistrer($conn, $user_id, $trajet_id, $contacts_valeurs);
             }
-            $success = true;
-            $t = [];
-            $contacts_valeurs = [];
-            $quota = quota_publication($conn, $user_id);
-            $limite_atteinte = !$quota['illimite'] && $quota['restantes'] <= 0;
+            // Redirection vers un formulaire vide : un rafraîchissement
+            // de la page ne republie pas le trajet une deuxième fois
+            $stmt->close();
+            $conn->close();
+            header("Location: publier.php?publie=1");
+            exit();
         } else {
             $erreur = "Erreur lors de la publication.";
         }
@@ -95,7 +100,9 @@ $conn->close();
             </p>
         <?php endif; ?>
 
-        <?php if (!$limite_atteinte): ?>
+        <?php if ($email_a_confirmer): ?>
+            <p class="quota quota-atteint"><i class="fa-solid fa-envelope"></i> Confirme ton adresse e-mail (lien reçu à l'inscription) pour pouvoir publier. Tu peux renvoyer l'e-mail depuis le bandeau en haut de la page.</p>
+        <?php elseif (!$limite_atteinte): ?>
         <form action="publier.php" method="POST">
             <?= csrf_field() ?>
             <?php include 'trajet_champs.php'; ?>

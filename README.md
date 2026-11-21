@@ -24,6 +24,11 @@ Plateforme web de mise en relation entre **GP** (voyageurs/transporteurs) et **e
 - Formule gratuite limitée à 5 publications par mois, comptes premium illimités (activés depuis l'admin)
 - Retours clients (suggestions, problèmes) consultables dans le panel admin
 - Aperçu avec logo quand on partage un lien (WhatsApp, Facebook...)
+- Confirmation de l'adresse e-mail, mot de passe oublié, suppression de son compte
+- Notifications : badge des messages non lus, e-mail à la réception d'un message, e-mail aux admins pour chaque retour client
+- Prix au kilo en dirham, euro, dollar ou franc CFA
+- Site adapté au mobile (menu ☰, messagerie, tableaux admin)
+- Sécurité : mots de passe bcrypt, requêtes préparées, jetons CSRF, cookies de session sécurisés, HTTPS forcé (optionnel), erreurs masquées en ligne
 
 ##  Aperçu
 
@@ -66,6 +71,7 @@ Plateforme web de mise en relation entre **GP** (voyageurs/transporteurs) et **e
 2. Créer une base de données MySQL nommée `safegp` puis y importer `schema.sql`
    - Base déjà existante : appliquer à la place les fichiers de `migrations/` dans l'ordre
 3. Copier `config.example.php` en `config.php` et renseigner vos identifiants de connexion à la base
+   (et, pour les e-mails, un serveur SMTP : voir les commentaires du fichier)
 4. Lancer le projet sur un serveur local (ex. XAMPP/WAMP) et ouvrir `index.php`
 
 ##  Statut

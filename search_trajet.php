@@ -1,6 +1,5 @@
 <?php
-include 'config.php';
-include 'init.php';
+require_once 'init.php';
 
 $depart = trim($_GET['depart'] ?? '');
 $arrivee = trim($_GET['arrivee'] ?? '');

@@ -1,6 +1,5 @@
 <?php
-include 'config.php';
-include 'init.php';
+require_once 'init.php';
 
 $erreur = "";
 
@@ -15,6 +14,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $user = $result->fetch_assoc();
 
     if ($user && password_verify($mot_de_passe, $user['mot_de_passe'])) {
+        // Nouvel identifiant de session à la connexion (évite le vol de session)
+        session_regenerate_id(true);
         $_SESSION['user_id'] = $user['id'];
         $_SESSION['user_nom'] = $user['nom'];
         $_SESSION['user_photo'] = $user['photo'];
@@ -41,8 +42,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <section class="publier">
         <h2>Se connecter</h2>
 
+        <?php if (isset($_GET['mdp']) && $_GET['mdp'] === 'change'): ?>
+            <p class="success"><i class="fa-solid fa-circle-check" style="color:#16a34a;"></i> Mot de passe modifié, tu peux te connecter.</p>
+        <?php endif; ?>
+
         <?php if ($erreur): ?>
-            <p class="erreur"><i class="fa-solid fa-circle-xmark" style="color:white;"></i> <?= $erreur ?></p>
+            <p class="erreur"><i class="fa-solid fa-circle-xmark" style="color:white;"></i> <?= e($erreur) ?></p>
         <?php endif; ?>
 
         <form action="connexion.php" method="POST">
@@ -57,6 +62,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 <label>Mot de passe</label>
                 <input type="password" name="mot_de_passe" required>
             </div>
+
+            <p style="text-align:right; margin:-10px 0 20px;">
+                <a href="mot_de_passe_oublie.php" style="color:#94a3b8; font-size:14px;">Mot de passe oublié ?</a>
+            </p>
 
             <button type="submit" class="btn-publier">Se connecter</button>
 

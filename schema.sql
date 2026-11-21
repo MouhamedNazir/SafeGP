@@ -22,6 +22,8 @@ CREATE TABLE `users` (
   `joignable_fin` time DEFAULT NULL,
   `whatsapp` varchar(20) DEFAULT NULL,
   `email` varchar(150) NOT NULL,
+  `email_verifie` tinyint(1) NOT NULL DEFAULT 0,
+  `notif_email` tinyint(1) NOT NULL DEFAULT 1,
   `mot_de_passe` varchar(255) NOT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `photo` varchar(255) DEFAULT NULL,
@@ -39,6 +41,7 @@ CREATE TABLE `trajets` (
   `heure_arrivee` time DEFAULT NULL,
   `date_limite_depot` date DEFAULT NULL,
   `prix_kilo` decimal(10,2) DEFAULT NULL,
+  `devise` enum('MAD','EUR','USD','XOF') NOT NULL DEFAULT 'MAD',
   `kilos_total` decimal(6,1) DEFAULT NULL,
   `kilos_restants` decimal(6,1) DEFAULT NULL,
   `statut` enum('disponible','en_route','arrivé') DEFAULT 'disponible',
@@ -93,6 +96,18 @@ CREATE TABLE `retours` (
   PRIMARY KEY (`id`),
   KEY `user_id` (`user_id`),
   CONSTRAINT `retours_user_fk` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+CREATE TABLE `jetons` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `user_id` int(11) NOT NULL,
+  `type` enum('verification','reinitialisation') NOT NULL,
+  `empreinte` char(64) NOT NULL,
+  `expire_le` datetime NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `empreinte` (`empreinte`),
+  KEY `user_id` (`user_id`),
+  CONSTRAINT `jetons_user_fk` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 SET FOREIGN_KEY_CHECKS = 1;

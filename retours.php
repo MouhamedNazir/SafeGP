@@ -4,8 +4,7 @@
 // Accessible à tous (connecté ou non). Les retours arrivent
 // dans le panel admin, section « Retours clients ».
 // ============================================================
-include 'config.php';
-include 'init.php';
+require_once 'init.php';
 
 $types = ['suggestion' => 'Une suggestion', 'probleme' => 'Un problème sur le site', 'autre' => 'Autre (question, passage au premium...)'];
 $connecte = isset($_SESSION['user_id']);
@@ -42,6 +41,20 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         if ($stmt->execute()) {
             $success = true;
             $_SESSION['dernier_retour'] = time();
+
+            // Prévenir les admins par e-mail (à l'adresse de leur compte)
+            $libelle = $types[$type];
+            $admins = $conn->query("SELECT email FROM users WHERE role = 'admin'");
+            while ($admin = $admins->fetch_assoc()) {
+                email_envoyer($admin['email'], 'Nouveau retour client : ' . $libelle, email_gabarit(
+                    'Nouveau retour : ' . $libelle,
+                    '<p><strong>De :</strong> ' . htmlspecialchars($nom ?? 'Anonyme') . ($email ? ' (' . htmlspecialchars($email) . ')' : '') . '</p>'
+                    . '<blockquote style="border-left:3px solid #f97316;margin:0;padding:5px 15px;color:#334155;">'
+                    . nl2br(htmlspecialchars($message)) . '</blockquote>',
+                    'Voir dans le panel admin',
+                    url_site() . '/admin.php#retours'
+                ));
+            }
         } else {
             $erreur = "Erreur lors de l'envoi, réessaie plus tard.";
         }

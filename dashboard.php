@@ -1,6 +1,5 @@
 <?php
-include 'config.php';
-include 'init.php';
+require_once 'init.php';
 
 // Seuls les connectés peuvent accéder au dashboard
 if (!isset($_SESSION['user_id'])) {

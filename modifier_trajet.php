@@ -1,6 +1,5 @@
 <?php
-include 'config.php';
-include 'init.php';
+require_once 'init.php';
 
 if (!isset($_SESSION['user_id'])) {
     header("Location: connexion.php");
@@ -49,14 +48,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $stmt = $conn->prepare("UPDATE trajets SET
             depart = ?, arrivee = ?, date_depart = ?, heure_depart = ?,
             date_arrivee = ?, heure_arrivee = ?, date_limite_depot = ?,
-            prix_kilo = ?, kilos_total = ?, kilos_restants = ?, telephone = ?, commentaire = ?,
+            prix_kilo = ?, devise = ?, kilos_total = ?, kilos_restants = ?, telephone = ?, commentaire = ?,
             point_depot = ?, horaires_depot = ?, point_reception = ?, horaires_reception = ?,
             pour_autrui = ?, voyageur_nom = ?
             WHERE id = ? AND user_id = ?");
-        $stmt->bind_param("sssssssdddssssssisii",
+        $stmt->bind_param("sssssssdsddssssssisii",
             $t['depart'], $t['arrivee'], $t['date_depart'], $t['heure_depart'],
             $t['date_arrivee'], $t['heure_arrivee'], $t['date_limite_depot'],
-            $t['prix_kilo'], $t['kilos_total'], $t['kilos_restants'], $t['telephone'], $t['commentaire'],
+            $t['prix_kilo'], $t['devise'], $t['kilos_total'], $t['kilos_restants'], $t['telephone'], $t['commentaire'],
             $t['point_depot'], $t['horaires_depot'], $t['point_reception'], $t['horaires_reception'],
             $t['pour_autrui'], $t['voyageur_nom'],
             $id_trajet, $user_id);

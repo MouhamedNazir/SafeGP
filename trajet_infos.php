@@ -22,7 +22,7 @@ $depot_cloture = !empty($row['date_limite_depot']) && $row['date_limite_depot'] 
         <span class="badge-statut" style="background-color:<?= $couleurs_statut[$row['statut']] ?? '#94a3b8' ?>;">
             <?= e($libelles_statut[$row['statut']] ?? $row['statut']) ?>
         </span>
-        <span class="prix"><?= e($row['prix_kilo']) ?> MAD/kg</span>
+        <span class="prix"><?= e(prix_kilo_fr($row['prix_kilo'], $row['devise'] ?? 'MAD')) ?></span>
     </div>
 </div>
 

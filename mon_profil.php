@@ -1,6 +1,5 @@
 <?php
-include 'config.php';
-include 'init.php';
+require_once 'init.php';
 
 // Seuls les utilisateurs connectés peuvent accéder à cette page
 if (!isset($_SESSION['user_id'])) {
@@ -82,6 +81,29 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_FILES['photo']) && $_FILES['
 // Ce formulaire est différent du formulaire photo
 // On le détecte avec isset($_POST['nom'])
 // ============================================================
+// ============================================================
+// SUPPRESSION DU COMPTE — mot de passe exigé pour confirmer
+// ============================================================
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['supprimer_compte'])) {
+    $nb_admins = (int)$conn->query("SELECT COUNT(*) FROM users WHERE role = 'admin'")->fetch_row()[0];
+
+    if (!password_verify($_POST['mot_de_passe_suppression'] ?? '', $user['mot_de_passe'])) {
+        $erreur = "Mot de passe incorrect : ton compte n'a pas été supprimé.";
+    } elseif (empty($_POST['confirmer_suppression'])) {
+        $erreur = "Coche la case pour confirmer la suppression.";
+    } elseif ($user['role'] === 'admin' && $nb_admins <= 1) {
+        $erreur = "Tu es le seul administrateur : nomme un autre admin avant de supprimer ton compte.";
+    } elseif (supprimer_utilisateur($conn, $user_id)) {
+        $conn->close();
+        session_unset();
+        session_destroy();
+        header("Location: index.php?compte=supprime");
+        exit();
+    } else {
+        $erreur = "La suppression a échoué, réessaie plus tard.";
+    }
+}
+
 $contacts_valeurs = contacts_profil($conn, $user_id);
 
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['nom'])) {
@@ -90,6 +112,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['nom'])) {
     // On force le username en minuscule pour éviter les doublons
     $username = strtolower(trim($_POST['username']));
     $disponible = !empty($_POST['disponible']) ? 1 : 0;
+    $notif_email = !empty($_POST['notif_email']) ? 1 : 0;
     $joignable_debut = vide_en_null($_POST['joignable_debut'] ?? '');
     $joignable_fin = vide_en_null($_POST['joignable_fin'] ?? '');
     $contacts_valeurs = contacts_depuis_post($erreur);
@@ -125,8 +148,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['nom'])) {
             $erreur = "Ce nom d'utilisateur est déjà pris.";
         } else {
             // Tout est bon → on met à jour les infos
-            $stmt = $conn->prepare("UPDATE users SET nom = ?, username = ?, disponible = ?, joignable_debut = ?, joignable_fin = ? WHERE id = ?");
-            $stmt->bind_param("ssissi", $nom, $username, $disponible, $joignable_debut, $joignable_fin, $user_id);
+            $stmt = $conn->prepare("UPDATE users SET nom = ?, username = ?, disponible = ?, notif_email = ?, joignable_debut = ?, joignable_fin = ? WHERE id = ?");
+            $stmt->bind_param("ssiissi", $nom, $username, $disponible, $notif_email, $joignable_debut, $joignable_fin, $user_id);
 
             if ($stmt->execute()) {
                 contacts_enregistrer($conn, $user_id, null, $contacts_valeurs);
@@ -139,6 +162,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['nom'])) {
                 $user['nom'] = $nom;
                 $user['username'] = $username;
                 $user['disponible'] = $disponible;
+                $user['notif_email'] = $notif_email;
                 $user['joignable_debut'] = $joignable_debut;
                 $user['joignable_fin'] = $joignable_fin;
             } else {
@@ -252,9 +276,34 @@ $conn->close();
             </div>
             <small style="color:#94a3b8; display:block; margin:-10px 0 20px;">Plage horaire où les clients peuvent t'appeler (facultatif).</small>
 
+            <h3 style="color:#f97316; margin:30px 0 20px;">Notifications</h3>
+            <label class="case-a-cocher">
+                <input type="checkbox" name="notif_email" value="1" <?= $user['notif_email'] ? 'checked' : '' ?>>
+                Recevoir un e-mail quand quelqu'un m'envoie un message
+            </label>
+
             <button type="submit" class="btn-publier">Sauvegarder</button>
 
         </form>
+
+        <!-- Zone de danger : suppression définitive du compte -->
+        <details class="zone-danger">
+            <summary><i class="fa-solid fa-triangle-exclamation"></i> Supprimer mon compte</summary>
+            <p>Cette action est <strong>définitive</strong> : ton profil, tes trajets, tes numéros et tes messages seront supprimés.</p>
+            <form action="mon_profil.php" method="POST">
+                <?= csrf_field() ?>
+                <input type="hidden" name="supprimer_compte" value="1">
+                <div class="form-group">
+                    <label>Ton mot de passe</label>
+                    <input type="password" name="mot_de_passe_suppression" required autocomplete="current-password">
+                </div>
+                <label class="case-a-cocher">
+                    <input type="checkbox" name="confirmer_suppression" value="1" required>
+                    Je comprends que c'est définitif
+                </label>
+                <button type="submit" class="btn-danger">Supprimer définitivement mon compte</button>
+            </form>
+        </details>
 
     </section>
 

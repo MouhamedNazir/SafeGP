@@ -9,6 +9,22 @@ const FREEMIUM_LIMITE_MOIS = 5;
 // Nombre maximum de numéros WhatsApp (profil ou trajet)
 const CONTACTS_MAX = 5;
 
+// Devises du prix au kilo : code en base => [symbole affiché, libellé du menu]
+const DEVISES = [
+    'MAD' => ['DH', 'Dirham marocain (DH)'],
+    'EUR' => ['€', 'Euro (€)'],
+    'USD' => ['$', 'Dollar américain ($)'],
+    'XOF' => ['FCFA', 'Franc CFA (FCFA)'],
+];
+
+// "50.00", "EUR" → "50 €/kg"
+function prix_kilo_fr($prix, ?string $devise): string
+{
+    $symbole = DEVISES[$devise ?? 'MAD'][0] ?? 'DH';
+    $nombre = rtrim(rtrim(number_format((float)$prix, 2, ',', ' '), '0'), ',');
+    return $nombre . ' ' . $symbole . '/kg';
+}
+
 // Raccourci pour échapper un texte à afficher
 function e($texte): string
 {
@@ -69,6 +85,7 @@ function trajet_depuis_post(): array
         'heure_arrivee'      => vide_en_null($_POST['heure_arrivee'] ?? ''),
         'date_limite_depot'  => vide_en_null($_POST['date_limite_depot'] ?? ''),
         'prix_kilo'          => $_POST['prix_kilo'] ?? '',
+        'devise'             => $_POST['devise'] ?? 'MAD',
         'kilos_total'        => $kilos_total,
         'kilos_restants'     => $kilos_restants,
         'telephone'          => vide_en_null($_POST['telephone'] ?? ''),
@@ -119,6 +136,9 @@ function trajet_valider(array &$t, array $contacts): string
     }
     if (!is_numeric($t['prix_kilo']) || $t['prix_kilo'] < 0) {
         return "Prix par kilo invalide.";
+    }
+    if (!isset(DEVISES[$t['devise']])) {
+        return "Devise invalide.";
     }
     if ($t['kilos_total'] !== null) {
         if (!is_numeric($t['kilos_total']) || $t['kilos_total'] <= 0 || $t['kilos_total'] > 9999) {
@@ -309,4 +329,46 @@ function badge_dispo_gp($disponible): string
     return $disponible
         ? '<span class="badge-dispo dispo-oui"><i class="fa-solid fa-circle"></i> Prend des colis</span>'
         : '<span class="badge-dispo dispo-non"><i class="fa-solid fa-circle"></i> Indisponible pour le moment</span>';
+}
+
+// ============================================================
+// SUPPRESSION D'UN COMPTE (par l'utilisateur ou par l'admin)
+// Les anciennes tables (messages, trajets) n'ont pas de suppression
+// en cascade : on efface d'abord ce qui dépend du compte, tout ou
+// rien (transaction). Numéros WhatsApp et jetons partent en cascade,
+// les retours clients sont conservés sans auteur.
+// ============================================================
+function supprimer_utilisateur(mysqli $conn, int $id): bool
+{
+    $stmt = $conn->prepare("SELECT photo FROM users WHERE id = ?");
+    $stmt->bind_param("i", $id);
+    $stmt->execute();
+    $u = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    if (!$u) return false;
+
+    $conn->begin_transaction();
+    try {
+        foreach ([
+            "DELETE FROM messages WHERE expediteur_id = ? OR destinataire_id = ?",
+            "DELETE FROM trajets WHERE user_id = ? AND user_id = ?",
+            "DELETE FROM users WHERE id = ? AND id = ?",
+        ] as $sql) {
+            $stmt = $conn->prepare($sql);
+            $stmt->bind_param("ii", $id, $id);
+            $stmt->execute();
+            $stmt->close();
+        }
+        $conn->commit();
+    } catch (mysqli_sql_exception $ex) {
+        $conn->rollback();
+        error_log('[SafeGP] Suppression du compte ' . $id . ' impossible : ' . $ex->getMessage());
+        return false;
+    }
+
+    // Photo de profil (nom de fichier contrôlé : user_<id>.<ext>)
+    if (!empty($u['photo']) && preg_match('/^user_\d+\.(jpe?g|png|webp)$/', $u['photo'])) {
+        @unlink(__DIR__ . '/uploads/' . $u['photo']);
+    }
+    return true;
 }

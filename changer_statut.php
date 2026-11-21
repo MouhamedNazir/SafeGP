@@ -1,6 +1,5 @@
 <?php
-include 'config.php';
-require_once 'csrf.php'; // démarre la session
+require_once 'init.php'; // session + jeton CSRF vérifié
 
 if (!isset($_SESSION['user_id'])) {
     header("Location: connexion.php");

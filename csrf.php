@@ -8,6 +8,16 @@
 // ============================================================
 
 if (session_status() === PHP_SESSION_NONE) {
+    // Cookie de session : invisible pour JavaScript (httponly), non envoyé
+    // par les sites tiers (samesite) et réservé à HTTPS quand il est actif
+    session_set_cookie_params([
+        'lifetime' => 0,
+        'path'     => '/',
+        'secure'   => function_exists('est_en_https') && est_en_https(),
+        'httponly' => true,
+        'samesite' => 'Lax',
+    ]);
+    ini_set('session.use_strict_mode', '1');
     session_start();
 }
 

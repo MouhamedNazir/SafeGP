@@ -1,6 +1,5 @@
 <?php
-include 'config.php';
-include 'init.php';
+require_once 'init.php';
 
 // Vérification — seuls les admins peuvent accéder
 // Si pas connecté ou pas admin → redirection
@@ -49,27 +48,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['supprimer_user'])) {
     $cible = $stmt->get_result()->fetch_assoc();
     $stmt->close();
 
-    if ($cible && $cible['role'] !== 'admin') {
-        // Les messages et trajets référencent l'utilisateur sans suppression
-        // en cascade : on les supprime d'abord, tout ou rien (transaction)
-        $conn->begin_transaction();
-        try {
-            foreach ([
-                "DELETE FROM messages WHERE expediteur_id = ? OR destinataire_id = ?",
-                "DELETE FROM trajets WHERE user_id = ? AND user_id = ?",
-                "DELETE FROM users WHERE id = ? AND id = ?",
-            ] as $sql) {
-                $stmt = $conn->prepare($sql);
-                $stmt->bind_param("ii", $id, $id);
-                $stmt->execute();
-                $stmt->close();
-            }
-            $conn->commit();
-        } catch (mysqli_sql_exception $ex) {
-            $conn->rollback();
-            header("Location: admin.php?erreur=suppression");
-            exit();
-        }
+    if ($cible && $cible['role'] !== 'admin' && !supprimer_utilisateur($conn, $id)) {
+        header("Location: admin.php?erreur=suppression");
+        exit();
     }
     header("Location: admin.php?success=user_supprime");
     exit();
@@ -222,6 +203,7 @@ $conn->close();
         <i class="fa-solid fa-users"></i> Utilisateurs
     </h3>
 
+    <div class="table-defilante">
     <table class="admin-table">
         <thead>
             <tr>
@@ -290,12 +272,14 @@ $conn->close();
             <?php endwhile; ?>
         </tbody>
     </table>
+    </div>
 
     <!-- TRAJETS -->
     <h3 style="color:#f97316; margin:40px 0 20px;">
         <i class="fa-solid fa-plane"></i> Trajets
     </h3>
 
+    <div class="table-defilante">
     <table class="admin-table">
         <thead>
             <tr>
@@ -315,7 +299,7 @@ $conn->close();
                 <td><?= htmlspecialchars($row['nom'] ?? 'Inconnu') ?></td>
                 <td><?= htmlspecialchars($row['depart']) ?> → <?= htmlspecialchars($row['arrivee']) ?></td>
                 <td><?= date('d/m/Y', strtotime($row['date_depart'])) ?></td>
-                <td><?= htmlspecialchars($row['prix_kilo']) ?> MAD</td>
+                <td><?= e(prix_kilo_fr($row['prix_kilo'], $row['devise'])) ?></td>
                 <td>
                     <?php
                         $couleurs = [
@@ -343,6 +327,7 @@ $conn->close();
             <?php endwhile; ?>
         </tbody>
     </table>
+    </div>
 
     <!-- RETOURS CLIENTS -->
     <h3 id="retours" style="color:#f97316; margin:40px 0 20px;">

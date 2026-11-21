@@ -3,8 +3,7 @@
 // RECHERCHE D'UTILISATEURS — par nom ou @username
 // Sans recherche : les derniers inscrits
 // ============================================================
-include 'config.php';
-include 'init.php';
+require_once 'init.php';
 
 $q = trim($_GET['q'] ?? '');
 $q_sql = ltrim($q, '@'); // "@moussa" → "moussa"

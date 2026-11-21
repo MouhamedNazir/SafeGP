@@ -1,8 +1,8 @@
 <?php
-include 'config.php';
-include 'init.php';
+require_once 'init.php';
 
 $success = false;
+$email_envoye = false;
 $erreur = "";
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
@@ -12,7 +12,16 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $mot_de_passe = $_POST['mot_de_passe'];
     $confirmation = $_POST['confirmation'];
 
-    if ($mot_de_passe !== $confirmation) {
+    if ($nom === '' || mb_strlen($nom) > 100) {
+        $erreur = "Indique ton nom complet.";
+
+    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $erreur = "Adresse e-mail invalide.";
+
+    } elseif (strlen($mot_de_passe) < 8) {
+        $erreur = "Le mot de passe doit faire au moins 8 caractères.";
+
+    } elseif ($mot_de_passe !== $confirmation) {
         $erreur = "Les mots de passe ne correspondent pas.";
 
     } elseif (strlen($username) < 3) {
@@ -28,9 +37,21 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $check->execute();
         $check->store_result();
 
+        // E-mail déjà inscrit ? (vérifié avant l'insertion : sinon MySQL
+        // lève une erreur de doublon qui interromprait la page)
+        $check_email = $conn->prepare("SELECT id FROM users WHERE email = ?");
+        $check_email->bind_param("s", $email);
+        $check_email->execute();
+        $check_email->store_result();
+        $email_pris = $check_email->num_rows > 0;
+        $check_email->close();
+
         if ($check->num_rows > 0) {
             $erreur = "Ce nom d'utilisateur est déjà pris.";
+        } elseif ($email_pris) {
+            $erreur = "Cet email est déjà utilisé.";
         } else {
+            // password_hash() = bcrypt, avec un sel aléatoire par mot de passe
             $hash = password_hash($mot_de_passe, PASSWORD_DEFAULT);
 
             $stmt = $conn->prepare("INSERT INTO users (nom, username, email, mot_de_passe) VALUES (?, ?, ?, ?)");
@@ -38,8 +59,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
             if ($stmt->execute()) {
                 $success = true;
+                // E-mail de confirmation (si l'envoi d'e-mails est configuré)
+                $email_envoye = email_actif() && email_envoyer_confirmation($conn, $stmt->insert_id, $email, $nom);
             } else {
-                $erreur = "Cet email est déjà utilisé.";
+                $erreur = "Erreur lors de l'inscription, réessaie.";
             }
 
             $stmt->close();
@@ -66,10 +89,15 @@ $conn->close();
 
         <?php if ($success): ?>
             <p class="success"><i class="fa-solid fa-circle-check" style="color:#16a34a;"></i> Compte créé ! <a href="connexion.php">Se connecter</a></p>
+            <?php if ($email_envoye): ?>
+                <p class="quota"><i class="fa-solid fa-envelope"></i> Un e-mail de confirmation vient d'être envoyé à <strong><?= e($email) ?></strong>.
+                Clique sur le lien qu'il contient pour pouvoir publier des trajets.
+                <?php if (!smtp_configure()): ?><br><small>(Mode local : l'e-mail est enregistré dans <code>logs/emails/</code>.)</small><?php endif; ?></p>
+            <?php endif; ?>
         <?php endif; ?>
 
         <?php if ($erreur): ?>
-            <p class="erreur"><i class="fa-solid fa-circle-xmark" style="color:white;"></i> <?= $erreur ?></p>
+            <p class="erreur"><i class="fa-solid fa-circle-xmark" style="color:white;"></i> <?= e($erreur) ?></p>
         <?php endif; ?>
 
         <form action="inscription.php" method="POST">
@@ -100,7 +128,7 @@ $conn->close();
             <div class="form-group">
                 <label>Mot de passe</label>
                 <input type="password" name="mot_de_passe" 
-                    placeholder="Min 6 caractères" required>
+                    placeholder="Au moins 8 caractères" minlength="8" required>
             </div>
 
             <div class="form-group">

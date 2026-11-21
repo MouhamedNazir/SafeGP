@@ -8,3 +8,7 @@ uploads/*
 # Fichiers système
 .DS_Store
 Thumbs.db
+
+# Journaux d'erreurs et e-mails enregistrés en local
+logs/*
+!logs/.htaccess

@@ -1,6 +1,5 @@
 <?php
-include 'config.php';
-include 'init.php';
+require_once 'init.php';
 
 // On récupère l'id du GP dans l'URL
 $id = (int)($_GET['id'] ?? 0);

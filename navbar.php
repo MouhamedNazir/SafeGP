@@ -7,12 +7,18 @@
         </a>
     </div>
 
-    <ul>
+    <!-- Bouton menu (visible seulement sur mobile) -->
+    <button type="button" class="nav-burger" aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="nav-liens">
+        <i class="fa-solid fa-bars"></i>
+        <?php if (!empty($nav_messages_non_lus) || !empty($nav_retours_non_lus)): ?><span class="burger-point"></span><?php endif; ?>
+    </button>
+
+    <ul id="nav-liens">
         <li><a href="index.php">Accueil</a></li>
         <li><a href="search_trajet.php">Rechercher</a></li>
         <li><a href="membres.php"><i class="fa-solid fa-users"></i> Membres</a></li>
         <li><a href="publier.php">Publier</a></li>
-        <li><a href="messagerie.php"><i class="fa-solid fa-message"></i> Messages</a></li>
+        <li><a href="messagerie.php"><i class="fa-solid fa-message"></i> Messages<?php if (!empty($nav_messages_non_lus)): ?><span class="badge-nonlu" title="Messages non lus"><?= (int)$nav_messages_non_lus ?></span><?php endif; ?></a></li>
 
         <?php if (isset($_SESSION['user_id'])): ?>
 
@@ -64,5 +70,40 @@
                 navMenu.classList.remove('show');
             });
         }
+
+        // Menu mobile : le bouton ☰ ouvre / ferme la liste des liens
+        const burger = document.querySelector('.nav-burger');
+        const navLiens = document.getElementById('nav-liens');
+        burger.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const ouvert = navLiens.classList.toggle('ouvert');
+            burger.setAttribute('aria-expanded', ouvert ? 'true' : 'false');
+            burger.querySelector('i').className = ouvert ? 'fa-solid fa-xmark' : 'fa-solid fa-bars';
+        });
     </script>
 </nav>
+
+<?php if (!empty($nav_email_a_confirmer)): ?>
+<div class="bandeau-info">
+    <i class="fa-solid fa-envelope"></i>
+    Confirme ton adresse e-mail grâce au lien que nous t'avons envoyé pour pouvoir publier des trajets.
+    <form action="renvoyer_confirmation.php" method="POST">
+        <?= csrf_field() ?>
+        <button type="submit" class="btn-lien">Renvoyer l'e-mail</button>
+    </form>
+</div>
+<?php endif; ?>
+<?php if (isset($_GET['confirmation'])): ?>
+<div class="bandeau-info">
+    <?php
+        $msgs_confirmation = [
+            'envoye'   => "E-mail de confirmation renvoyé. Pense à regarder dans les spams.",
+            'deja'     => "Ton adresse e-mail est déjà confirmée.",
+            'attendre' => "Patiente une minute avant de redemander l'e-mail.",
+            'erreur'   => "L'e-mail n'a pas pu être envoyé, réessaie plus tard.",
+        ];
+        echo e($msgs_confirmation[$_GET['confirmation']] ?? '');
+    ?>
+</div>
+<?php endif; ?>
+

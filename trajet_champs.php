@@ -49,8 +49,15 @@ $hhmm = fn($cle) => e(substr((string)($t[$cle] ?? ''), 0, 5));
 
 <div class="form-row">
     <div class="form-group">
-        <label>Prix par kilo (MAD)</label>
-        <input type="number" name="prix_kilo" step="0.01" min="0" value="<?= $v('prix_kilo') ?>" placeholder="Ex: 15" required>
+        <label>Prix par kilo</label>
+        <div class="prix-devise">
+            <input type="number" name="prix_kilo" step="0.01" min="0" value="<?= $v('prix_kilo') ?>" placeholder="Ex: 15" required>
+            <select name="devise" aria-label="Devise">
+                <?php foreach (DEVISES as $code => [$symbole, $libelle]): ?>
+                    <option value="<?= $code ?>" <?= ($t['devise'] ?? 'MAD') === $code ? 'selected' : '' ?>><?= e($libelle) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
     </div>
     <div class="form-group">
         <label>Capacité totale (kg) <span class="facultatif">(facultatif)</span></label>

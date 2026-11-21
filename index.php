@@ -1,6 +1,5 @@
 <?php
-include 'config.php';
-include 'init.php';
+require_once 'init.php';
 
 // On récupère les 6 derniers GPs qui ont des trajets disponibles
 $stmt = $conn->prepare("
@@ -27,6 +26,9 @@ $conn->close();
 </head>
 <body>
 <?php include 'navbar.php'; ?>
+<?php if (isset($_GET['compte']) && $_GET['compte'] === 'supprime'): ?>
+    <div class="bandeau-info">Ton compte a bien été supprimé. Merci d'avoir utilisé SafeGP.</div>
+<?php endif; ?>
 
     
 

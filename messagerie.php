@@ -1,6 +1,5 @@
 <?php
-include 'config.php';
-include 'init.php';
+require_once 'init.php';
 
 // Seuls les connectés peuvent accéder à la messagerie
 if (!isset($_SESSION['user_id'])) {
@@ -17,11 +16,38 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['contenu'])) {
     $destinataire_id = (int)$_POST['destinataire_id'];
     $contenu = trim($_POST['contenu']);
 
-    if (!empty($contenu) && $destinataire_id !== $user_id) {
+    // Le destinataire doit exister (sinon MySQL refuse l'insertion)
+    $stmt = $conn->prepare("SELECT id, nom, email, email_verifie, notif_email,
+            (SELECT COUNT(*) FROM messages WHERE expediteur_id = ? AND destinataire_id = users.id AND lu = 0) AS deja_non_lus
+        FROM users WHERE id = ?");
+    $stmt->bind_param("ii", $user_id, $destinataire_id);
+    $stmt->execute();
+    $destinataire = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    if ($destinataire && $contenu !== '' && $destinataire_id !== (int)$user_id) {
+        $contenu = mb_substr($contenu, 0, 2000);
         $stmt = $conn->prepare("INSERT INTO messages (expediteur_id, destinataire_id, contenu) VALUES (?, ?, ?)");
         $stmt->bind_param("iis", $user_id, $destinataire_id, $contenu);
         $stmt->execute();
         $stmt->close();
+
+        // Notification par e-mail : seulement pour le premier message non lu
+        // de cet expéditeur, pour ne pas inonder la boîte du destinataire
+        if ($destinataire['notif_email'] && $destinataire['email_verifie'] && (int)$destinataire['deja_non_lus'] === 0) {
+            $expediteur_nom = $_SESSION['user_nom'] ?? 'Un membre';
+            $html = email_gabarit(
+                'Nouveau message de ' . $expediteur_nom,
+                '<p>Bonjour ' . htmlspecialchars($destinataire['nom']) . ',</p>'
+                . '<p><strong>' . htmlspecialchars($expediteur_nom) . '</strong> t’a envoyé un message sur SafeGP :</p>'
+                . '<blockquote style="border-left:3px solid #f97316;margin:0;padding:5px 15px;color:#334155;">'
+                . nl2br(htmlspecialchars(mb_strimwidth($contenu, 0, 300, '…'))) . '</blockquote>'
+                . '<p style="font-size:12px;color:#64748b;">Tu peux désactiver ces e-mails dans « Mon profil ».</p>',
+                'Répondre',
+                url_site() . '/messagerie.php?with=' . (int)$user_id
+            );
+            email_envoyer($destinataire['email'], 'Nouveau message de ' . $expediteur_nom . ' - SafeGP', $html);
+        }
     }
 
     header("Location: messagerie.php?with=" . $destinataire_id);
@@ -105,7 +131,8 @@ $conn->close();
 
 <section class="messagerie">
 
-    <div class="messagerie-container">
+    <!-- Sur mobile : la liste OU la conversation ouverte, pas les deux -->
+    <div class="messagerie-container <?= ($with_id && !empty($interlocuteur)) ? 'conv-ouverte' : '' ?>">
 
         <!-- LISTE DES CONVERSATIONS -->
         <div class="conv-liste">
@@ -154,6 +181,7 @@ $conn->close();
 
                 <!-- Header conversation -->
                 <div class="conv-header">
+                    <a href="messagerie.php" class="conv-retour" aria-label="Retour aux conversations"><i class="fa-solid fa-arrow-left"></i></a>
                     <div class="conv-avatar">
                         <?php if (!empty($interlocuteur['photo'])): ?>
                             <img src="uploads/<?= htmlspecialchars($interlocuteur['photo']) ?>"
