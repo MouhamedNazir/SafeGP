@@ -66,7 +66,7 @@ $kg = str_replace('.', ',', (string)((float)$e['kilos'] + 0));
         <div class="recu-colonnes">
             <div class="recu-bloc">
                 <h4>GP (transporteur)</h4>
-                <p><strong><?= e($e['gp_nom']) ?></strong> (@<?= e($e['gp_username'] ?? '') ?>)<?= $e['gp_verifie'] ? ' — identité vérifiée' : '' ?></p>
+                <p><strong><?= e($e['gp_nom']) ?></strong> (@<?= e($e['gp_username'] ?? '') ?>)<?= $e['gp_verifie'] ? ' <span>— identité vérifiée</span>' : '' ?></p>
             </div>
             <div class="recu-bloc">
                 <h4>Expéditeur</h4>

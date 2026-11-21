@@ -21,3 +21,6 @@ verifications/*
 # Preuves de paiement et photos des colis (données privées)
 preuves/*
 !preuves/.htaccess
+
+# Visuels publicitaires (affiches, vidéos) générés hors du site
+pubs/

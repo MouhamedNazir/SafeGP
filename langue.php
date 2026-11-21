@@ -75,9 +75,14 @@ function traduire_html(string $html, string $langue, bool $email = false): strin
     // 1. On met de côté ce qui ne doit jamais être traduit :
     //    scripts, styles, zones de saisie (contenu tapé par les membres)
     $proteges = [];
-    $html = preg_replace_callback('#<(script|style|textarea)\b[^>]*>.*?</\1>#si', function ($m) use (&$proteges) {
+    $html = preg_replace_callback('#<(script|style)\b[^>]*>.*?</\1>#si', function ($m) use (&$proteges) {
         $proteges[] = $m[0];
         return "\x01" . (count($proteges) - 1) . "\x01";
+    }, $html);
+    // Zones de saisie : seul le contenu est protégé, la balise (placeholder…) reste traduisible
+    $html = preg_replace_callback('#(<textarea\b[^>]*>)(.*?)(</textarea>)#si', function ($m) use (&$proteges) {
+        $proteges[] = $m[2];
+        return $m[1] . "\x01" . (count($proteges) - 1) . "\x01" . $m[3];
     }, $html);
 
     // 2. Textes entre les balises : traduits seulement s'ils correspondent exactement
