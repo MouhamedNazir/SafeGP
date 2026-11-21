@@ -256,7 +256,7 @@ $conn->close();
 <body>
 <?php include 'navbar.php'; ?>
 
-<section class="profil">
+<section class="profil page-admin">
     <h2><i class="fa-solid fa-shield"></i> Panel Admin</h2>
 
     <?php if (isset($_GET['success'])): ?>

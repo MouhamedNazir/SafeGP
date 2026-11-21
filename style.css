@@ -1811,6 +1811,13 @@ h3 .badge-nonlu {
     color: var(--texte-doux);
     margin: 4px 0 0;
 }
+/* Le panel admin a besoin de toute la largeur pour ses tableaux */
+.profil.page-admin {
+    max-width: 1200px;
+}
+.page-admin .stat-card {
+    flex: 1 1 150px;
+}
 .table-defilante {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
