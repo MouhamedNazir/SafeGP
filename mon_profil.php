@@ -39,6 +39,16 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_FILES['photo']) && $_FILES['
     } elseif ($fichier['size'] > 2 * 1024 * 1024) {
         $erreur = "L'image ne doit pas dépasser 2MB.";
 
+    // Vérification 3 — le contenu est-il vraiment une image ?
+    // L'extension se falsifie facilement (ex: script.php renommé en photo.jpg),
+    // donc on lit le vrai type du fichier avec finfo + getimagesize
+    } elseif (
+        $fichier['error'] !== UPLOAD_ERR_OK
+        || !in_array((new finfo(FILEINFO_MIME_TYPE))->file($fichier['tmp_name']), ['image/jpeg', 'image/png', 'image/webp'], true)
+        || @getimagesize($fichier['tmp_name']) === false
+    ) {
+        $erreur = "Le fichier n'est pas une image valide.";
+
     } else {
         // On crée un nom unique basé sur l'id user pour éviter les conflits
         // Ex: user_1.jpg — si l'user rechange sa photo, ça écrase l'ancienne
@@ -173,6 +183,7 @@ $conn->close();
         <div class="form-group">
             <label>Changer ma photo de profil</label>
             <form action="mon_profil.php" method="POST" enctype="multipart/form-data">
+                <?= csrf_field() ?>
                 <input type="file" name="photo" accept=".jpg,.jpeg,.png,.webp"
                        style="color:white; margin-bottom:10px;">
                 <button type="submit" class="btn-publier">Mettre à jour la photo</button>
@@ -184,6 +195,7 @@ $conn->close();
         <!-- Formulaire 2 — Modifier les infos -->
         <h3 style="color:#f97316; margin-bottom:20px;">Mes informations</h3>
         <form action="mon_profil.php" method="POST">
+            <?= csrf_field() ?>
 
             <div class="form-group">
                 <label>Nom complet</label>

@@ -1,11 +1,18 @@
 <?php
 include 'config.php';
-session_start();
+require_once 'csrf.php'; // démarre la session
 
 if (!isset($_SESSION['user_id'])) {
     header("Location: connexion.php");
     exit();
 }
+
+// Uniquement en POST, avec un jeton CSRF valide
+if ($_SERVER["REQUEST_METHOD"] !== "POST") {
+    header("Location: dashboard.php");
+    exit();
+}
+csrf_verify();
 
 $user_id = $_SESSION['user_id'];
 $id_trajet = (int)$_POST['id_trajet'];

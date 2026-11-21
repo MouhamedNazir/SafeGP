@@ -73,6 +73,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         <?php endif; ?>
 
         <form action="publier.php" method="POST">
+            <?= csrf_field() ?>
 
             <div class="form-group">
                 <label>Ville de départ</label>

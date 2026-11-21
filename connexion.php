@@ -45,6 +45,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         <?php endif; ?>
 
         <form action="connexion.php" method="POST">
+            <?= csrf_field() ?>
 
             <div class="form-group">
                 <label>Email</label>

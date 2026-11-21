@@ -84,6 +84,7 @@ $conn->close();
         <?php endif; ?>
 
         <form action="modifier_trajet.php?id=<?= $id_trajet ?>" method="POST">
+            <?= csrf_field() ?>
 
             <div class="form-group">
                 <label>Ville de départ</label>

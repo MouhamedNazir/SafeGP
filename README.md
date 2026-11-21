@@ -57,7 +57,7 @@ Plateforme web de mise en relation entre **GP** (voyageurs/transporteurs) et **e
    ```bash
    git clone https://github.com/MouhamedNazir/SafeGP.git
    ```
-2. Créer une base de données MySQL nommée `safegp`
+2. Créer une base de données MySQL nommée `safegp` puis y importer `schema.sql`
 3. Copier `config.example.php` en `config.php` et renseigner vos identifiants de connexion à la base
 4. Lancer le projet sur un serveur local (ex. XAMPP/WAMP) et ouvrir `index.php`
 

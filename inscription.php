@@ -72,6 +72,7 @@ $conn->close();
         <?php endif; ?>
 
         <form action="inscription.php" method="POST">
+            <?= csrf_field() ?>
 
             <div class="form-group">
                 <label>Nom complet</label>

@@ -183,6 +183,7 @@ $conn->close();
 
                 <!-- Formulaire d'envoi -->
                 <form action="messagerie.php" method="POST" class="msg-form">
+                    <?= csrf_field() ?>
                     <input type="hidden" name="destinataire_id" value="<?= $with_id ?>">
                     <input type="text" name="contenu" 
                            placeholder="Écrire un message..." 

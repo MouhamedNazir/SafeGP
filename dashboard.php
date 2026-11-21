@@ -16,8 +16,9 @@ $user_id = $_SESSION['user_id'];
 // "AND user_id = ?" → sécurité pour qu'un user ne supprime pas
 // le trajet d'un autre
 // ============================================================
-if (isset($_GET['supprimer'])) {
-    $id_trajet = (int)$_GET['supprimer'];
+// En POST (et non en GET) : un simple lien ne doit jamais pouvoir supprimer
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['supprimer'])) {
+    $id_trajet = (int)$_POST['supprimer'];
 
     $stmt = $conn->prepare("DELETE FROM trajets WHERE id = ? AND user_id = ?");
     $stmt->bind_param("ii", $id_trajet, $user_id);
@@ -137,6 +138,7 @@ $conn->close();
 
                         <!-- Formulaire pour changer le statut du trajet -->
                         <form action="changer_statut.php" method="POST" style="display:flex; gap:10px;">
+                            <?= csrf_field() ?>
                             <input type="hidden" name="id_trajet" value="<?= $row['id'] ?>">
                             <select name="statut" style="padding:8px; border-radius:5px; background-color:#0f172a; color:white; border:none;">
                                 <!-- "selected" sur la valeur actuelle pour pré-sélectionner -->
@@ -155,13 +157,15 @@ $conn->close();
                         </a>
 
                         <!-- Bouton supprimer → confirm() demande confirmation avant de supprimer -->
-                        <a href="dashboard.php?supprimer=<?= $row['id'] ?>" 
-                            
-                            class="btn-contact" 
-                            style="background-color:#991b1b; padding:8px 14px; font-size:13px; display:flex; align-items:center; gap:6px;"
-                            onclick="return confirm('Tu veux vraiment supprimer ce trajet ?')">
-                        <i class="fa-solid fa-trash"></i> Supprimer
-</a>
+                        <form action="dashboard.php" method="POST" style="margin:0;"
+                              onsubmit="return confirm('Tu veux vraiment supprimer ce trajet ?')">
+                            <?= csrf_field() ?>
+                            <input type="hidden" name="supprimer" value="<?= (int)$row['id'] ?>">
+                            <button type="submit" class="btn-contact"
+                                style="background-color:#991b1b; padding:8px 14px; font-size:13px; display:flex; align-items:center; gap:6px; border:none; cursor:pointer; font-family:inherit;">
+                                <i class="fa-solid fa-trash"></i> Supprimer
+                            </button>
+                        </form>
 
                     </div>
 

@@ -27,8 +27,9 @@ if ($admin['role'] !== 'admin') {
 // ============================================================
 
 // Supprimer un trajet abusif
-if (isset($_GET['supprimer_trajet'])) {
-    $id = (int)$_GET['supprimer_trajet'];
+// Les suppressions passent par POST (+ jeton CSRF vérifié dans navbar.php)
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['supprimer_trajet'])) {
+    $id = (int)$_POST['supprimer_trajet'];
     $stmt = $conn->prepare("DELETE FROM trajets WHERE id = ?");
     $stmt->bind_param("i", $id);
     $stmt->execute();
@@ -38,8 +39,8 @@ if (isset($_GET['supprimer_trajet'])) {
 }
 
 // Supprimer un utilisateur
-if (isset($_GET['supprimer_user'])) {
-    $id = (int)$_GET['supprimer_user'];
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['supprimer_user'])) {
+    $id = (int)$_POST['supprimer_user'];
     $stmt = $conn->prepare("DELETE FROM users WHERE id = ? AND role != 'admin'");
     $stmt->bind_param("i", $id);
     $stmt->execute();
@@ -162,6 +163,7 @@ $conn->close();
                 <td>
                     <!-- Changer le rôle -->
                     <form action="admin.php" method="POST" style="display:inline;">
+                        <?= csrf_field() ?>
                         <input type="hidden" name="changer_role" value="1">
                         <input type="hidden" name="user_id" value="<?= $user['id'] ?>">
                         <select name="role" onchange="this.form.submit()"
@@ -174,11 +176,14 @@ $conn->close();
                 <td><?= date('d/m/Y', strtotime($user['created_at'])) ?></td>
                 <td>
                     <?php if ($user['role'] != 'admin'): ?>
-                        <a href="admin.php?supprimer_user=<?= $user['id'] ?>"
-                           style="color:#f97316;"
-                           onclick="return confirm('Supprimer cet utilisateur ?')">
-                            <i class="fa-solid fa-trash"></i>
-                        </a>
+                        <form action="admin.php" method="POST" style="display:inline; margin:0;"
+                              onsubmit="return confirm('Supprimer cet utilisateur ?')">
+                            <?= csrf_field() ?>
+                            <input type="hidden" name="supprimer_user" value="<?= (int)$user['id'] ?>">
+                            <button type="submit" title="Supprimer" style="background:none; border:none; padding:0; cursor:pointer; color:#f97316;">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                        </form>
                     <?php else: ?>
                         <span style="color:#94a3b8;">protégé</span>
                     <?php endif; ?>
@@ -227,11 +232,14 @@ $conn->close();
                     </span>
                 </td>
                 <td>
-                    <a href="admin.php?supprimer_trajet=<?= $row['id'] ?>"
-                       style="color:#f97316;"
-                       onclick="return confirm('Supprimer ce trajet ?')">
-                        <i class="fa-solid fa-trash"></i>
-                    </a>
+                    <form action="admin.php" method="POST" style="display:inline; margin:0;"
+                          onsubmit="return confirm('Supprimer ce trajet ?')">
+                        <?= csrf_field() ?>
+                        <input type="hidden" name="supprimer_trajet" value="<?= (int)$row['id'] ?>">
+                        <button type="submit" title="Supprimer" style="background:none; border:none; padding:0; cursor:pointer; color:#f97316;">
+                            <i class="fa-solid fa-trash"></i>
+                        </button>
+                    </form>
                 </td>
             </tr>
             <?php endwhile; ?>

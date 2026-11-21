@@ -1,4 +1,7 @@
-<?php session_start(); ?>
+<?php
+require_once __DIR__ . "/csrf.php";
+csrf_verify(); // bloque tout POST sans jeton CSRF valide
+?>
 
 <nav>
     <div class="logo_container">

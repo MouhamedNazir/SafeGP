@@ -3,7 +3,7 @@ include 'config.php';
 include 'navbar.php';
 
 // On récupère l'id du GP dans l'URL
-$id = $_GET['id'] ?? null;
+$id = (int)($_GET['id'] ?? 0);
 
 if (!$id) {
     header("Location: index.php");
