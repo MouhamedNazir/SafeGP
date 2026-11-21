@@ -26,7 +26,7 @@ $conn->close();
 <?php include 'navbar.php'; ?>
     <section class="publier" style="text-align:center;">
         <?php if ($user_id): ?>
-            <p class="success"><i class="fa-solid fa-circle-check" style="color:#16a34a;"></i> Ton adresse e-mail est confirmée, merci !</p>
+            <p class="success"><i class="fa-solid fa-circle-check" style="color:var(--vert);"></i> Ton adresse e-mail est confirmée, merci !</p>
             <a href="<?= isset($_SESSION['user_id']) ? 'publier.php' : 'connexion.php' ?>" class="btn-contact">
                 <?= isset($_SESSION['user_id']) ? 'Publier un trajet' : 'Se connecter' ?>
             </a>

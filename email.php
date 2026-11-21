@@ -49,7 +49,7 @@ function email_gabarit(string $titre, string $contenu_html, ?string $bouton_text
          . '<div style="background:#ffffff;border-radius:10px;padding:25px;color:#0f172a;line-height:1.6;">'
          . '<h2 style="margin-top:0;font-size:18px;">' . htmlspecialchars($titre) . '</h2>'
          . $contenu_html . $bouton
-         . '</div><p style="font-size:12px;color:#64748b;text-align:center;">SafeGP — colis entre le Maroc et le Sénégal</p>'
+         . '</div><p style="font-size:12px;color:#64748b;text-align:center;">SafeGP — vos colis partout dans le monde</p>'
          . '</div></body></html>';
 }
 

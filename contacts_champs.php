@@ -22,4 +22,4 @@ $lignes = $contacts_valeurs ?: [['nom' => '', 'numero' => '']];
 <button type="button" class="contact-ajouter">
     <i class="fa-solid fa-plus"></i> Ajouter un numéro
 </button>
-<small style="color:#94a3b8;">Jusqu'à <?= CONTACTS_MAX ?> numéros. Chaque numéro s'affiche avec le nom de son propriétaire.</small>
+<small style="color:var(--texte-doux);">Jusqu'à <?= CONTACTS_MAX ?> numéros. Chaque numéro s'affiche avec le nom de son propriétaire.</small>

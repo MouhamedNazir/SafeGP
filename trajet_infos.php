@@ -13,9 +13,15 @@ $depot_cloture = !empty($row['date_limite_depot']) && $row['date_limite_depot'] 
 ?>
 <div class="annonce-header">
     <span class="trajet-titre">
-        <i class="fa-solid fa-plane-departure"></i> <?= e($row['depart']) ?>
-        →
-        <i class="fa-solid fa-plane-arrival"></i> <?= e($row['arrivee']) ?>
+        <span class="trajet-ville">
+            <?= drapeau($row['pays_depart'] ?? null) ?>
+            <span><?= e($row['depart']) ?><?php if (!empty($row['pays_depart'])): ?><small><?= e(nom_pays($row['pays_depart'])) ?></small><?php endif; ?></span>
+        </span>
+        <span class="trajet-fleche" aria-hidden="true"><i class="fa-solid fa-plane"></i></span>
+        <span class="trajet-ville">
+            <?= drapeau($row['pays_arrivee'] ?? null) ?>
+            <span><?= e($row['arrivee']) ?><?php if (!empty($row['pays_arrivee'])): ?><small><?= e(nom_pays($row['pays_arrivee'])) ?></small><?php endif; ?></span>
+        </span>
     </span>
 
     <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
@@ -44,7 +50,7 @@ $depot_cloture = !empty($row['date_limite_depot']) && $row['date_limite_depot'] 
     <?php if (!empty($row['pour_autrui']) && !empty($row['voyageur_nom'])): ?>
     <div class="info-ligne">
         <span><i class="fa-solid fa-user"></i> Voyageur :</span>
-        <span><?= e($row['voyageur_nom']) ?> <small style="color:#94a3b8;">(annonce publiée pour lui/elle)</small></span>
+        <span><?= e($row['voyageur_nom']) ?> <small style="color:var(--texte-doux);">(annonce publiée pour lui/elle)</small></span>
     </div>
     <?php endif; ?>
 

@@ -46,15 +46,15 @@ $conn->close();
         <h2>Mot de passe oublié</h2>
 
         <?php if ($envoye): ?>
-            <p class="success"><i class="fa-solid fa-envelope" style="color:#16a34a;"></i>
+            <p class="success"><i class="fa-solid fa-envelope" style="color:var(--vert);"></i>
                 Si un compte existe avec cette adresse, un e-mail avec un lien de réinitialisation vient d'être envoyé.
                 Pense à regarder dans les spams. Le lien est valable 1 heure.</p>
-            <?php if (!smtp_configure()): ?><p style="text-align:center; color:#94a3b8;"><small>(Mode local : l'e-mail est enregistré dans <code>logs/emails/</code>.)</small></p><?php endif; ?>
+            <?php if (!smtp_configure()): ?><p style="text-align:center; color:var(--texte-doux);"><small>(Mode local : l'e-mail est enregistré dans <code>logs/emails/</code>.)</small></p><?php endif; ?>
         <?php else: ?>
             <?php if ($erreur): ?>
                 <p class="erreur"><i class="fa-solid fa-circle-xmark" style="color:white;"></i> <?= e($erreur) ?></p>
             <?php endif; ?>
-            <p style="text-align:center; color:#94a3b8; margin-bottom:25px;">Indique l'adresse e-mail de ton compte : on t'envoie un lien pour choisir un nouveau mot de passe.</p>
+            <p style="text-align:center; color:var(--texte-doux); margin-bottom:25px;">Indique l'adresse e-mail de ton compte : on t'envoie un lien pour choisir un nouveau mot de passe.</p>
             <form action="mot_de_passe_oublie.php" method="POST">
                 <?= csrf_field() ?>
                 <div class="form-group">
@@ -64,7 +64,7 @@ $conn->close();
                 <button type="submit" class="btn-publier">Recevoir le lien</button>
             </form>
         <?php endif; ?>
-        <p style="text-align:center; margin-top:20px;"><a href="connexion.php" style="color:#f97316;">← Retour à la connexion</a></p>
+        <p style="text-align:center; margin-top:20px;"><a href="connexion.php" style="color:var(--orange);">← Retour à la connexion</a></p>
     </section>
 <?php include 'footer.php'; ?>
 </body>

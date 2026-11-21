@@ -36,7 +36,7 @@ $conn->close();
 
 // Aperçu du lien quand on partage ce profil (WhatsApp, Facebook...)
 $og_title = $user['nom'] . " — GP sur SafeGP";
-$og_description = "Voir les trajets de " . $user['nom'] . " et lui confier vos colis entre le Maroc et le Sénégal.";
+$og_description = "Voir les trajets de " . $user['nom'] . " et lui confier vos colis, partout dans le monde.";
 ?>
 
 <!DOCTYPE html>
@@ -70,7 +70,7 @@ $og_description = "Voir les trajets de " . $user['nom'] . " et lui confier vos c
             <div>
                 <h2><?= e($user['nom']) ?></h2>
                 <?php if (!empty($user['username'])): ?>
-                    <p style="color:#f97316;">@<?= e($user['username']) ?></p>
+                    <p style="color:var(--orange);">@<?= e($user['username']) ?></p>
                 <?php endif; ?>
                 <p><?= badge_dispo_gp($user['disponible']) ?></p>
                 <?php if (!empty($user['joignable_debut']) && !empty($user['joignable_fin'])): ?>
@@ -92,21 +92,23 @@ $og_description = "Voir les trajets de " . $user['nom'] . " et lui confier vos c
 
         <?php if ($trajets): ?>
             <?php foreach ($trajets as $row): ?>
-                <div class="annonce">
+                <div class="annonce" id="trajet-<?= (int)$row['id'] ?>">
                     <?php $avec_gp = false; include 'trajet_infos.php'; ?>
 
-                    <div class="annonce-footer" style="display:flex; gap:10px; flex-wrap:wrap;">
+                    <div class="annonce-footer">
+                        <?php if (isset($_SESSION['user_id']) && $_SESSION['user_id'] != $user['id']): ?>
+                            <a href="messagerie.php?with=<?= (int)$user['id'] ?>&amp;trajet=<?= (int)$row['id'] ?>" class="btn-contact">
+                                <i class="fa-solid fa-message"></i> Contacter pour ce trajet
+                            </a>
+                        <?php endif; ?>
                         <?php if (!empty($row['telephone'])): ?>
-                            <a href="tel:<?= e($row['telephone']) ?>" class="btn-contact">
+                            <a href="tel:<?= e($row['telephone']) ?>" class="btn-contact btn-secondaire">
                                 <i class="fa-solid fa-phone"></i> <?= e($row['telephone']) ?>
                             </a>
                         <?php endif; ?>
 
                         <?php afficher_boutons_whatsapp($contacts[$row['id']] ?? []); ?>
 
-                        <?php if (empty($row['telephone']) && empty($contacts[$row['id']])): ?>
-                            <span class="no-contact"><i class="fa-solid fa-phone"></i> Contact non renseigné</span>
-                        <?php endif; ?>
                     </div>
                 </div>
             <?php endforeach; ?>

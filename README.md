@@ -1,6 +1,6 @@
 # SafeGP
 
-Plateforme web de mise en relation entre **GP** (voyageurs/transporteurs) et **expéditeurs de colis** sur les trajets Maroc ↔ Sénégal.
+Plateforme web de mise en relation entre **GP** (voyageurs/transporteurs) et **expéditeurs de colis** partout dans le monde (né sur l'axe Maroc ↔ Sénégal).
 
 🔗 **Démo en ligne** : [safegp.free.nf](http://safegp.free.nf)
 
@@ -27,6 +27,10 @@ Plateforme web de mise en relation entre **GP** (voyageurs/transporteurs) et **e
 - Confirmation de l'adresse e-mail, mot de passe oublié, suppression de son compte
 - Notifications : badge des messages non lus, e-mail à la réception d'un message, e-mail aux admins pour chaque retour client
 - Prix au kilo en dirham, euro, dollar ou franc CFA
+- Ouvert au monde entier : pays de départ et d'arrivée avec drapeaux, 8 devises (DH, €, $, FCFA, £, $ CA, CHF)
+- Recherche par pays, ville et période (cette semaine, ce mois-ci, entre deux dates)
+- Messagerie en direct : messages sans rechargement, « Vu », séparateurs de jours, recherche de conversations, bouton « Contacter pour ce trajet »
+- Thème clair et sombre (bouton ☀/☾, suit le réglage de l'appareil)
 - Site adapté au mobile (menu ☰, messagerie, tableaux admin)
 - Sécurité : mots de passe bcrypt, requêtes préparées, jetons CSRF, cookies de session sécurisés, HTTPS forcé (optionnel), erreurs masquées en ligne
 

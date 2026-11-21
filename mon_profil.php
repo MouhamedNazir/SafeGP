@@ -190,7 +190,7 @@ $conn->close();
         <h2>Mon profil</h2>
 
         <?php if ($success): ?>
-            <p class="success"><i class="fa-solid fa-circle-check" style="color:#16a34a;"></i> <?= e($success) ?></p>
+            <p class="success"><i class="fa-solid fa-circle-check" style="color:var(--vert);"></i> <?= e($success) ?></p>
         <?php endif; ?>
 
         <?php if ($erreur): ?>
@@ -213,7 +213,7 @@ $conn->close();
             </div>
             <div>
                 <h3><?= htmlspecialchars($user['nom']) ?></h3>
-                <p style="color:#f97316;">@<?= htmlspecialchars($user['username']) ?></p>
+                <p style="color:var(--orange);">@<?= htmlspecialchars($user['username']) ?></p>
                 <p class="profil-date">Membre depuis <?= date('d/m/Y', strtotime($user['created_at'])) ?></p>
             </div>
         </div>
@@ -225,15 +225,15 @@ $conn->close();
             <form action="mon_profil.php" method="POST" enctype="multipart/form-data">
                 <?= csrf_field() ?>
                 <input type="file" name="photo" accept=".jpg,.jpeg,.png,.webp"
-                       style="color:white; margin-bottom:10px;">
+                       style="color:var(--texte); margin-bottom:10px;">
                 <button type="submit" class="btn-publier">Mettre à jour la photo</button>
             </form>
         </div>
 
-        <hr style="border-color:#1e293b; margin: 40px 0;">
+        <hr style="border-color:var(--surface); margin: 40px 0;">
 
         <!-- Formulaire 2 — Modifier les infos -->
-        <h3 style="color:#f97316; margin-bottom:20px;">Mes informations</h3>
+        <h3 style="color:var(--orange); margin-bottom:20px;">Mes informations</h3>
         <form action="mon_profil.php" method="POST">
             <?= csrf_field() ?>
 
@@ -247,22 +247,22 @@ $conn->close();
                 <label>Nom d'utilisateur</label>
                 <input type="text" name="username" 
                        value="<?= htmlspecialchars($user['username']) ?>" required>
-                <small style="color:#94a3b8;">Lettres, chiffres et _ uniquement</small>
+                <small style="color:var(--texte-doux);">Lettres, chiffres et _ uniquement</small>
             </div>
 
             <div class="form-group">
                 <label>Mes numéros WhatsApp</label>
                 <?php include 'contacts_champs.php'; ?>
-                <small style="color:#94a3b8;">Ces numéros seront visibles sur tes annonces.</small>
+                <small style="color:var(--texte-doux);">Ces numéros seront visibles sur tes annonces.</small>
             </div>
 
-            <h3 style="color:#f97316; margin:30px 0 20px;">Ma disponibilité</h3>
+            <h3 style="color:var(--orange); margin:30px 0 20px;">Ma disponibilité</h3>
 
             <label class="case-a-cocher">
                 <input type="checkbox" name="disponible" value="1" <?= $user['disponible'] ? 'checked' : '' ?>>
                 Je prends des colis en ce moment
             </label>
-            <small style="color:#94a3b8; display:block; margin:-10px 0 20px;">Décoché, ton profil affiche « Indisponible pour le moment » et tu n'apparais plus dans les GPs disponibles de l'accueil.</small>
+            <small style="color:var(--texte-doux); display:block; margin:-10px 0 20px;">Décoché, ton profil affiche « Indisponible pour le moment » et tu n'apparais plus dans les GPs disponibles de l'accueil.</small>
 
             <div class="form-row">
                 <div class="form-group">
@@ -274,9 +274,9 @@ $conn->close();
                     <input type="time" name="joignable_fin" value="<?= e(substr((string)$user['joignable_fin'], 0, 5)) ?>">
                 </div>
             </div>
-            <small style="color:#94a3b8; display:block; margin:-10px 0 20px;">Plage horaire où les clients peuvent t'appeler (facultatif).</small>
+            <small style="color:var(--texte-doux); display:block; margin:-10px 0 20px;">Plage horaire où les clients peuvent t'appeler (facultatif).</small>
 
-            <h3 style="color:#f97316; margin:30px 0 20px;">Notifications</h3>
+            <h3 style="color:var(--orange); margin:30px 0 20px;">Notifications</h3>
             <label class="case-a-cocher">
                 <input type="checkbox" name="notif_email" value="1" <?= $user['notif_email'] ? 'checked' : '' ?>>
                 Recevoir un e-mail quand quelqu'un m'envoie un message

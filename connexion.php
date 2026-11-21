@@ -43,7 +43,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         <h2>Se connecter</h2>
 
         <?php if (isset($_GET['mdp']) && $_GET['mdp'] === 'change'): ?>
-            <p class="success"><i class="fa-solid fa-circle-check" style="color:#16a34a;"></i> Mot de passe modifié, tu peux te connecter.</p>
+            <p class="success"><i class="fa-solid fa-circle-check" style="color:var(--vert);"></i> Mot de passe modifié, tu peux te connecter.</p>
         <?php endif; ?>
 
         <?php if ($erreur): ?>
@@ -64,13 +64,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             </div>
 
             <p style="text-align:right; margin:-10px 0 20px;">
-                <a href="mot_de_passe_oublie.php" style="color:#94a3b8; font-size:14px;">Mot de passe oublié ?</a>
+                <a href="mot_de_passe_oublie.php" style="color:var(--texte-doux); font-size:14px;">Mot de passe oublié ?</a>
             </p>
 
             <button type="submit" class="btn-publier">Se connecter</button>
 
             <p style="text-align:center; margin-top:20px;">
-                Pas de compte ? <a href="inscription.php" style="color:#f97316;">S'inscrire</a>
+                Pas de compte ? <a href="inscription.php" style="color:var(--orange);">S'inscrire</a>
             </p>
 
         </form>

@@ -44,7 +44,7 @@ $conn->close();
 
         <?php if (!$user_id): ?>
             <p class="erreur"><i class="fa-solid fa-circle-xmark" style="color:white;"></i> Ce lien n'est plus valide (déjà utilisé ou expiré).</p>
-            <p style="text-align:center;"><a href="mot_de_passe_oublie.php" style="color:#f97316;">Demander un nouveau lien</a></p>
+            <p style="text-align:center;"><a href="mot_de_passe_oublie.php" style="color:var(--orange);">Demander un nouveau lien</a></p>
         <?php else: ?>
             <?php if ($erreur): ?>
                 <p class="erreur"><i class="fa-solid fa-circle-xmark" style="color:white;"></i> <?= e($erreur) ?></p>

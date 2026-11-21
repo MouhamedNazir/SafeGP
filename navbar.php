@@ -1,17 +1,25 @@
 <?php // Barre de navigation : à inclure juste après <body> (init.php doit être inclus avant) ?>
 <nav>
     <div class="logo_container">
-        <a href="index.php" style="display:flex; align-items:center; gap:10px; text-decoration:none; color:white;">
+        <a href="index.php" class="logo-lien">
             <img src="images/SafeGP_logo.png" alt="SafeGP_logo" id="logo_img">
             <h1>Safe<span class="gp">GP</span></h1>
         </a>
     </div>
+
+    <div class="nav-actions">
+    <!-- Bascule thème clair / sombre -->
+    <button type="button" class="nav-theme" aria-label="Changer de thème" title="Thème clair / sombre">
+        <i class="fa-solid fa-sun icone-clair"></i>
+        <i class="fa-solid fa-moon icone-sombre"></i>
+    </button>
 
     <!-- Bouton menu (visible seulement sur mobile) -->
     <button type="button" class="nav-burger" aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="nav-liens">
         <i class="fa-solid fa-bars"></i>
         <?php if (!empty($nav_messages_non_lus) || !empty($nav_retours_non_lus)): ?><span class="burger-point"></span><?php endif; ?>
     </button>
+    </div>
 
     <ul id="nav-liens">
         <li><a href="index.php">Accueil</a></li>
@@ -37,14 +45,14 @@
                     <li><a href="mon_profil.php"><i class="fa-solid fa-user"></i> Mon profil</a></li>
                     <li><a href="dashboard.php"><i class="fa-solid fa-list"></i> Mes trajets</a></li>
                     <li><a href="publier.php"><i class="fa-solid fa-plus"></i> Publier</a></li>
-                    <hr style="border-color:#0f172a;">
+                    <li class="separateur" role="separator"></li>
                     <?php if (!empty($nav_is_admin)): ?>
                         <li><a href="admin.php"><i class="fa-solid fa-shield"></i> Admin
                             <?php if (!empty($nav_retours_non_lus)): ?><span class="badge-nonlu" title="Retours clients non lus"><?= (int)$nav_retours_non_lus ?></span><?php endif; ?>
                         </a></li>
                     <?php endif; ?>
                     <li><a href="retours.php"><i class="fa-solid fa-lightbulb"></i> Donner mon avis</a></li>
-                    <li><a href="deconnexion.php" style="color:#f97316;"><i class="fa-solid fa-right-from-bracket"></i> Déconnexion</a></li>
+                    <li><a href="deconnexion.php" class="lien-deconnexion"><i class="fa-solid fa-right-from-bracket"></i> Déconnexion</a></li>
                 </ul>
             </li>
 
@@ -70,6 +78,14 @@
                 navMenu.classList.remove('show');
             });
         }
+
+        // Thème clair / sombre : mémorisé dans le navigateur
+        document.querySelector('.nav-theme').addEventListener('click', function() {
+            const racine = document.documentElement;
+            const theme = racine.getAttribute('data-theme') === 'clair' ? 'sombre' : 'clair';
+            racine.setAttribute('data-theme', theme);
+            try { localStorage.setItem('safegp-theme', theme); } catch (e) {}
+        });
 
         // Menu mobile : le bouton ☰ ouvre / ferme la liste des liens
         const burger = document.querySelector('.nav-burger');

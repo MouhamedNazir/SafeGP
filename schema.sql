@@ -34,14 +34,16 @@ CREATE TABLE `users` (
 CREATE TABLE `trajets` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `depart` varchar(100) DEFAULT NULL,
+  `pays_depart` char(2) DEFAULT NULL,
   `arrivee` varchar(100) DEFAULT NULL,
+  `pays_arrivee` char(2) DEFAULT NULL,
   `date_depart` date DEFAULT NULL,
   `heure_depart` time DEFAULT NULL,
   `date_arrivee` date DEFAULT NULL,
   `heure_arrivee` time DEFAULT NULL,
   `date_limite_depot` date DEFAULT NULL,
   `prix_kilo` decimal(10,2) DEFAULT NULL,
-  `devise` enum('MAD','EUR','USD','XOF') NOT NULL DEFAULT 'MAD',
+  `devise` enum('MAD','EUR','USD','XOF','XAF','GBP','CAD','CHF') NOT NULL DEFAULT 'MAD',
   `kilos_total` decimal(6,1) DEFAULT NULL,
   `kilos_restants` decimal(6,1) DEFAULT NULL,
   `statut` enum('disponible','en_route','arrivé') DEFAULT 'disponible',
@@ -57,20 +59,25 @@ CREATE TABLE `trajets` (
   `created_at` timestamp NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`id`),
   KEY `user_id` (`user_id`),
+  KEY `idx_pays` (`pays_depart`,`pays_arrivee`),
+  KEY `idx_date_depart` (`date_depart`),
   CONSTRAINT `trajets_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 CREATE TABLE `messages` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `expediteur_id` int(11) NOT NULL,
   `destinataire_id` int(11) NOT NULL,
+  `trajet_id` int(11) DEFAULT NULL,
   `contenu` text NOT NULL,
   `lu` tinyint(4) DEFAULT 0,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`id`),
   KEY `expediteur_id` (`expediteur_id`),
   KEY `destinataire_id` (`destinataire_id`),
+  KEY `trajet_id` (`trajet_id`),
   CONSTRAINT `messages_ibfk_1` FOREIGN KEY (`expediteur_id`) REFERENCES `users` (`id`),
-  CONSTRAINT `messages_ibfk_2` FOREIGN KEY (`destinataire_id`) REFERENCES `users` (`id`)
+  CONSTRAINT `messages_ibfk_2` FOREIGN KEY (`destinataire_id`) REFERENCES `users` (`id`),
+  CONSTRAINT `messages_trajet_fk` FOREIGN KEY (`trajet_id`) REFERENCES `trajets` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 CREATE TABLE `contacts_whatsapp` (
   `id` int(11) NOT NULL AUTO_INCREMENT,

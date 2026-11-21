@@ -76,7 +76,7 @@ $conn->close();
                 <div class="gp-card-info">
                     <h4><?= e($m['nom']) ?></h4>
                     <?php if (!empty($m['username'])): ?>
-                        <p style="color:#f97316;">@<?= e($m['username']) ?></p>
+                        <p style="color:var(--orange);">@<?= e($m['username']) ?></p>
                     <?php endif; ?>
                     <p><?= badge_dispo_gp($m['disponible']) ?></p>
                     <p class="gp-card-trajet">

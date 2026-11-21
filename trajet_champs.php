@@ -14,8 +14,19 @@ $hhmm = fn($cle) => e(substr((string)($t[$cle] ?? ''), 0, 5));
 
 <div class="form-row">
     <div class="form-group">
+        <label>Pays de départ</label>
+        <select name="pays_depart" required><?= options_pays($t['pays_depart'] ?? null) ?></select>
+    </div>
+    <div class="form-group">
         <label>Ville de départ</label>
         <input type="text" name="depart" value="<?= $v('depart') ?>" placeholder="Ex: Casablanca" required>
+    </div>
+</div>
+
+<div class="form-row">
+    <div class="form-group">
+        <label>Pays d'arrivée</label>
+        <select name="pays_arrivee" required><?= options_pays($t['pays_arrivee'] ?? null) ?></select>
     </div>
     <div class="form-group">
         <label>Ville d'arrivée</label>
@@ -74,7 +85,7 @@ $hhmm = fn($cle) => e(substr((string)($t[$cle] ?? ''), 0, 5));
 <div class="form-group">
     <label>Date limite de dépôt des colis <span class="facultatif">(facultatif)</span></label>
     <input type="date" name="date_limite_depot" <?= empty($avec_kilos_restants) ? 'min="' . date('Y-m-d') . '"' : '' ?> value="<?= $v('date_limite_depot') ?>">
-    <small style="color:#94a3b8;">Dernier jour où tu acceptes de recevoir des colis (au plus tard le jour du départ).</small>
+    <small style="color:var(--texte-doux);">Dernier jour où tu acceptes de recevoir des colis (au plus tard le jour du départ).</small>
 </div>
 
 <div class="form-row">
@@ -125,7 +136,7 @@ $hhmm = fn($cle) => e(substr((string)($t[$cle] ?? ''), 0, 5));
         <label>Numéros WhatsApp pour ce trajet</label>
         <?php include 'contacts_champs.php'; ?>
     </div>
-    <small style="color:#94a3b8;">Ces numéros remplacent ceux de ton profil sur cette annonce.</small>
+    <small style="color:var(--texte-doux);">Ces numéros remplacent ceux de ton profil sur cette annonce.</small>
 </div>
 <p class="aide-contact" <?= !empty($t['pour_autrui']) ? 'hidden' : '' ?>>
     <i class="fa-brands fa-whatsapp"></i> Les numéros WhatsApp de <a href="mon_profil.php">ton profil</a> s'afficheront sur l'annonce.

@@ -75,12 +75,12 @@ $conn->close();
 
     <section class="publier">
         <h2><i class="fa-solid fa-lightbulb"></i> Donner mon avis</h2>
-        <p style="text-align:center; color:#94a3b8; margin-bottom:30px;">
+        <p style="text-align:center; color:var(--texte-doux); margin-bottom:30px;">
             Une idée pour améliorer SafeGP, un souci sur le site, une question ? Écris-nous, on lit tout.
         </p>
 
         <?php if ($success): ?>
-            <p class="success"><i class="fa-solid fa-circle-check" style="color:#16a34a;"></i> Merci ! Ton message a bien été envoyé.</p>
+            <p class="success"><i class="fa-solid fa-circle-check" style="color:var(--vert);"></i> Merci ! Ton message a bien été envoyé.</p>
             <p style="text-align:center;"><a href="index.php">← Retour à l'accueil</a></p>
         <?php else: ?>
 

@@ -61,7 +61,7 @@ $conn->close();
 
         <?php if (isset($_GET['success'])): ?>
             <p class="success">
-                <i class="fa-solid fa-circle-check" style="color:#16a34a;"></i>
+                <i class="fa-solid fa-circle-check" style="color:var(--vert);"></i>
                 <?php if ($_GET['success'] == 'supprime') echo "Trajet supprimé !"; ?>
                 <?php if ($_GET['success'] == 'modifie') echo "Trajet modifié !"; ?>
                 <?php if ($_GET['success'] == 'kilos') echo "Trajet mis à jour !"; ?>
@@ -96,13 +96,13 @@ $conn->close();
                     <?php endif; ?>
 
                     <!-- Footer : changer statut + modifier + supprimer -->
-                    <div class="annonce-footer" style="display:flex; gap:10px; flex-wrap:wrap;">
+                    <div class="annonce-footer">
 
                         <!-- Formulaire pour changer le statut du trajet -->
-                        <form action="changer_statut.php" method="POST" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                        <form action="changer_statut.php" method="POST" class="form-statut">
                             <?= csrf_field() ?>
                             <input type="hidden" name="id_trajet" value="<?= $row['id'] ?>">
-                            <select name="statut" style="padding:8px; border-radius:5px; background-color:#0f172a; color:white; border:none;">
+                            <select name="statut" class="select-petit">
                                 <!-- "selected" sur la valeur actuelle pour pré-sélectionner -->
                                 <option value="disponible" <?= $row['statut'] == 'disponible' ? 'selected' : '' ?>>disponible</option>
                                 <option value="en_route" <?= $row['statut'] == 'en_route' ? 'selected' : '' ?>>en route</option>
@@ -119,19 +119,16 @@ $conn->close();
                         </form>
 
                         <!-- Bouton modifier → redirige vers modifier_trajet.php avec l'id -->
-                        <a href="modifier_trajet.php?id=<?= $row['id'] ?>" 
-                            class="btn-contact" 
-                            style="padding:8px 14px; font-size:13px; display:flex; align-items:center; gap:6px;">
+                        <a href="modifier_trajet.php?id=<?= $row['id'] ?>" class="btn-contact btn-secondaire">
                             <i class="fa-solid fa-pen"></i> Modifier
                         </a>
 
                         <!-- Bouton supprimer → confirm() demande confirmation avant de supprimer -->
-                        <form action="dashboard.php" method="POST" style="margin:0;"
+                        <form action="dashboard.php" method="POST" class="form-inline"
                               onsubmit="return confirm('Tu veux vraiment supprimer ce trajet ?')">
                             <?= csrf_field() ?>
                             <input type="hidden" name="supprimer" value="<?= (int)$row['id'] ?>">
-                            <button type="submit" class="btn-contact"
-                                style="background-color:#991b1b; padding:8px 14px; font-size:13px; display:flex; align-items:center; gap:6px; border:none; cursor:pointer; font-family:inherit;">
+                            <button type="submit" class="btn-contact btn-supprimer">
                                 <i class="fa-solid fa-trash"></i> Supprimer
                             </button>
                         </form>

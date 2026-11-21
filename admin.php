@@ -177,17 +177,17 @@ $conn->close();
     <!-- STATISTIQUES -->
     <div style="display:flex; gap:20px; margin-bottom:40px; flex-wrap:wrap;">
         <div class="stat-card">
-            <i class="fa-solid fa-users" style="font-size:30px; color:#f97316;"></i>
+            <i class="fa-solid fa-users" style="font-size:30px; color:var(--orange);"></i>
             <h3><?= $total_users ?></h3>
             <p>Utilisateurs</p>
         </div>
         <div class="stat-card">
-            <i class="fa-solid fa-plane" style="font-size:30px; color:#f97316;"></i>
+            <i class="fa-solid fa-plane" style="font-size:30px; color:var(--orange);"></i>
             <h3><?= $total_trajets ?></h3>
             <p>Trajets total</p>
         </div>
         <div class="stat-card">
-            <i class="fa-solid fa-circle-check" style="font-size:30px; color:#16a34a;"></i>
+            <i class="fa-solid fa-circle-check" style="font-size:30px; color:var(--vert);"></i>
             <h3><?= $trajets_dispo ?></h3>
             <p>Trajets disponibles</p>
         </div>
@@ -199,7 +199,7 @@ $conn->close();
     </div>
 
     <!-- UTILISATEURS -->
-    <h3 style="color:#f97316; margin-bottom:20px;">
+    <h3 style="color:var(--orange); margin-bottom:20px;">
         <i class="fa-solid fa-users"></i> Utilisateurs
     </h3>
 
@@ -231,7 +231,7 @@ $conn->close();
                         <input type="hidden" name="changer_role" value="1">
                         <input type="hidden" name="user_id" value="<?= $user['id'] ?>">
                         <select name="role" onchange="this.form.submit()"
-                                style="padding:4px; border-radius:5px; background-color:#0f172a; color:white; border:none;">
+                                class="select-petit">
                             <option value="user" <?= $user['role'] == 'user' ? 'selected' : '' ?>>user</option>
                             <option value="admin" <?= $user['role'] == 'admin' ? 'selected' : '' ?>>admin</option>
                         </select>
@@ -244,13 +244,13 @@ $conn->close();
                         <input type="hidden" name="changer_premium" value="1">
                         <input type="hidden" name="user_id" value="<?= (int)$user['id'] ?>">
                         <select name="premium" onchange="this.form.submit()"
-                                style="padding:4px; border-radius:5px; background-color:#0f172a; color:white; border:none;">
+                                class="select-petit">
                             <option value="0" <?= !$user['premium'] ? 'selected' : '' ?>>gratuit</option>
                             <option value="1" <?= $user['premium'] ? 'selected' : '' ?>>premium</option>
                         </select>
                     </form>
                     <?php if (!$user['premium'] && $user['role'] != 'admin'): ?>
-                        <small style="color:#94a3b8; display:block;"><?= (int)$user['publications_mois'] ?>/<?= FREEMIUM_LIMITE_MOIS ?> ce mois</small>
+                        <small style="color:var(--texte-doux); display:block;"><?= (int)$user['publications_mois'] ?>/<?= FREEMIUM_LIMITE_MOIS ?> ce mois</small>
                     <?php endif; ?>
                 </td>
                 <td><?= date('d/m/Y', strtotime($user['created_at'])) ?></td>
@@ -260,12 +260,12 @@ $conn->close();
                               onsubmit="return confirm('Supprimer cet utilisateur ?')">
                             <?= csrf_field() ?>
                             <input type="hidden" name="supprimer_user" value="<?= (int)$user['id'] ?>">
-                            <button type="submit" title="Supprimer" style="background:none; border:none; padding:0; cursor:pointer; color:#f97316;">
+                            <button type="submit" title="Supprimer" style="background:none; border:none; padding:0; cursor:pointer; color:var(--orange);">
                                 <i class="fa-solid fa-trash"></i>
                             </button>
                         </form>
                     <?php else: ?>
-                        <span style="color:#94a3b8;">protégé</span>
+                        <span style="color:var(--texte-doux);">protégé</span>
                     <?php endif; ?>
                 </td>
             </tr>
@@ -275,7 +275,7 @@ $conn->close();
     </div>
 
     <!-- TRAJETS -->
-    <h3 style="color:#f97316; margin:40px 0 20px;">
+    <h3 style="color:var(--orange); margin:40px 0 20px;">
         <i class="fa-solid fa-plane"></i> Trajets
     </h3>
 
@@ -318,7 +318,7 @@ $conn->close();
                           onsubmit="return confirm('Supprimer ce trajet ?')">
                         <?= csrf_field() ?>
                         <input type="hidden" name="supprimer_trajet" value="<?= (int)$row['id'] ?>">
-                        <button type="submit" title="Supprimer" style="background:none; border:none; padding:0; cursor:pointer; color:#f97316;">
+                        <button type="submit" title="Supprimer" style="background:none; border:none; padding:0; cursor:pointer; color:var(--orange);">
                             <i class="fa-solid fa-trash"></i>
                         </button>
                     </form>
@@ -330,13 +330,13 @@ $conn->close();
     </div>
 
     <!-- RETOURS CLIENTS -->
-    <h3 id="retours" style="color:#f97316; margin:40px 0 20px;">
+    <h3 id="retours" style="color:var(--orange); margin:40px 0 20px;">
         <i class="fa-solid fa-lightbulb"></i> Retours clients
         <?php if ($retours_non_lus): ?><span class="badge-nonlu"><?= $retours_non_lus ?></span><?php endif; ?>
     </h3>
 
     <?php if ($retours->num_rows === 0): ?>
-        <p style="color:#94a3b8;">Aucun retour pour l'instant. Les visiteurs peuvent t'en envoyer depuis la page <a href="retours.php">Donner mon avis</a>.</p>
+        <p style="color:var(--texte-doux);">Aucun retour pour l'instant. Les visiteurs peuvent t'en envoyer depuis la page <a href="retours.php">Donner mon avis</a>.</p>
     <?php endif; ?>
 
     <?php $types_retour = ['suggestion' => 'Suggestion', 'probleme' => 'Problème', 'autre' => 'Autre']; ?>
@@ -370,7 +370,7 @@ $conn->close();
                 <form action="admin.php" method="POST" onsubmit="return confirm('Supprimer ce retour ?')">
                     <?= csrf_field() ?>
                     <input type="hidden" name="supprimer_retour" value="<?= (int)$r['id'] ?>">
-                    <button type="submit" class="btn-lien" style="color:#f97316;"><i class="fa-solid fa-trash"></i> Supprimer</button>
+                    <button type="submit" class="btn-lien" style="color:var(--orange);"><i class="fa-solid fa-trash"></i> Supprimer</button>
                 </form>
             </div>
         </div>

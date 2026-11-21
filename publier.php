@@ -34,13 +34,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     // Tout est bon → on insère
     if (!$erreur) {
         $stmt = $conn->prepare("INSERT INTO trajets
-            (depart, arrivee, date_depart, heure_depart, date_arrivee, heure_arrivee, date_limite_depot,
+            (depart, pays_depart, arrivee, pays_arrivee, date_depart, heure_depart, date_arrivee, heure_arrivee, date_limite_depot,
              prix_kilo, devise, kilos_total, kilos_restants, telephone, commentaire,
              point_depot, horaires_depot, point_reception, horaires_reception,
              pour_autrui, voyageur_nom, user_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-        $stmt->bind_param("sssssssdsddssssssisi",
-            $t['depart'], $t['arrivee'], $t['date_depart'], $t['heure_depart'],
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt->bind_param("sssssssssdsddssssssisi",
+            $t['depart'], $t['pays_depart'], $t['arrivee'], $t['pays_arrivee'], $t['date_depart'], $t['heure_depart'],
             $t['date_arrivee'], $t['heure_arrivee'], $t['date_limite_depot'],
             $t['prix_kilo'], $t['devise'], $t['kilos_total'], $t['kilos_restants'], $t['telephone'], $t['commentaire'],
             $t['point_depot'], $t['horaires_depot'], $t['point_reception'], $t['horaires_reception'],
@@ -79,7 +79,7 @@ $conn->close();
         <h2>Publier un trajet</h2>
 
         <?php if ($success): ?>
-            <p class="success"><i class="fa-solid fa-circle-check" style="color:#16a34a;"></i> Trajet publié avec succès ! <a href="dashboard.php">Voir mes trajets</a></p>
+            <p class="success"><i class="fa-solid fa-circle-check" style="color:var(--vert);"></i> Trajet publié avec succès ! <a href="dashboard.php">Voir mes trajets</a></p>
         <?php endif; ?>
 
         <?php if ($erreur): ?>

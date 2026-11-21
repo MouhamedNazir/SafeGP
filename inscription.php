@@ -88,7 +88,7 @@ $conn->close();
         <h2>Créer un compte</h2>
 
         <?php if ($success): ?>
-            <p class="success"><i class="fa-solid fa-circle-check" style="color:#16a34a;"></i> Compte créé ! <a href="connexion.php">Se connecter</a></p>
+            <p class="success"><i class="fa-solid fa-circle-check" style="color:var(--vert);"></i> Compte créé ! <a href="connexion.php">Se connecter</a></p>
             <?php if ($email_envoye): ?>
                 <p class="quota"><i class="fa-solid fa-envelope"></i> Un e-mail de confirmation vient d'être envoyé à <strong><?= e($email) ?></strong>.
                 Clique sur le lien qu'il contient pour pouvoir publier des trajets.
@@ -115,7 +115,7 @@ $conn->close();
                 <input type="text" name="username" 
                     value="<?= htmlspecialchars($_POST['username'] ?? '') ?>"
                     placeholder="Ex: mamadou_gp" required>
-                <small style="color:#94a3b8;">Lettres, chiffres et _ uniquement. Ex: mamadou_gp</small>
+                <small style="color:var(--texte-doux);">Lettres, chiffres et _ uniquement. Ex: mamadou_gp</small>
             </div>
 
             <div class="form-group">
@@ -140,7 +140,7 @@ $conn->close();
             <button type="submit" class="btn-publier">Créer mon compte</button>
 
             <p style="text-align:center; margin-top:20px;">
-                Déjà un compte ? <a href="connexion.php" style="color:#f97316;">Se connecter</a>
+                Déjà un compte ? <a href="connexion.php" style="color:var(--orange);">Se connecter</a>
             </p>
 
         </form>

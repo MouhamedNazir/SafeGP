@@ -7,117 +7,85 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
-$user_id = $_SESSION['user_id'];
+$user_id = (int)$_SESSION['user_id'];
 
 // ============================================================
-// ENVOI D'UN MESSAGE
+// ENVOI D'UN MESSAGE (sans JavaScript ; sinon messages_api.php)
 // ============================================================
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['contenu'])) {
-    $destinataire_id = (int)$_POST['destinataire_id'];
-    $contenu = trim($_POST['contenu']);
-
-    // Le destinataire doit exister (sinon MySQL refuse l'insertion)
-    $stmt = $conn->prepare("SELECT id, nom, email, email_verifie, notif_email,
-            (SELECT COUNT(*) FROM messages WHERE expediteur_id = ? AND destinataire_id = users.id AND lu = 0) AS deja_non_lus
-        FROM users WHERE id = ?");
-    $stmt->bind_param("ii", $user_id, $destinataire_id);
-    $stmt->execute();
-    $destinataire = $stmt->get_result()->fetch_assoc();
-    $stmt->close();
-
-    if ($destinataire && $contenu !== '' && $destinataire_id !== (int)$user_id) {
-        $contenu = mb_substr($contenu, 0, 2000);
-        $stmt = $conn->prepare("INSERT INTO messages (expediteur_id, destinataire_id, contenu) VALUES (?, ?, ?)");
-        $stmt->bind_param("iis", $user_id, $destinataire_id, $contenu);
-        $stmt->execute();
-        $stmt->close();
-
-        // Notification par e-mail : seulement pour le premier message non lu
-        // de cet expéditeur, pour ne pas inonder la boîte du destinataire
-        if ($destinataire['notif_email'] && $destinataire['email_verifie'] && (int)$destinataire['deja_non_lus'] === 0) {
-            $expediteur_nom = $_SESSION['user_nom'] ?? 'Un membre';
-            $html = email_gabarit(
-                'Nouveau message de ' . $expediteur_nom,
-                '<p>Bonjour ' . htmlspecialchars($destinataire['nom']) . ',</p>'
-                . '<p><strong>' . htmlspecialchars($expediteur_nom) . '</strong> t’a envoyé un message sur SafeGP :</p>'
-                . '<blockquote style="border-left:3px solid #f97316;margin:0;padding:5px 15px;color:#334155;">'
-                . nl2br(htmlspecialchars(mb_strimwidth($contenu, 0, 300, '…'))) . '</blockquote>'
-                . '<p style="font-size:12px;color:#64748b;">Tu peux désactiver ces e-mails dans « Mon profil ».</p>',
-                'Répondre',
-                url_site() . '/messagerie.php?with=' . (int)$user_id
-            );
-            email_envoyer($destinataire['email'], 'Nouveau message de ' . $expediteur_nom . ' - SafeGP', $html);
-        }
-    }
-
+    $destinataire_id = (int)($_POST['destinataire_id'] ?? 0);
+    $trajet_id = (int)($_POST['trajet_id'] ?? 0) ?: null;
+    message_envoyer($conn, $user_id, $_SESSION['user_nom'] ?? 'Un membre', $destinataire_id, (string)$_POST['contenu'], $trajet_id);
     header("Location: messagerie.php?with=" . $destinataire_id);
     exit();
 }
 
 // ============================================================
-// CONVERSATION ACTIVE
-// Si ?with=X dans l'URL → on affiche la conversation avec X
+// CONVERSATION ACTIVE (?with=X), éventuellement à propos d'un trajet (&trajet=T)
 // ============================================================
 $with_id = (int)($_GET['with'] ?? 0);
+$interlocuteur = null;
+$messages = [];
+$vu_jusqua = 0;
+$trajet_cite = null;
 
-if ($with_id) {
-    // Marquer les messages reçus comme lus
-    $stmt = $conn->prepare("UPDATE messages SET lu = 1 
-        WHERE expediteur_id = ? AND destinataire_id = ? AND lu = 0");
-    $stmt->bind_param("ii", $with_id, $user_id);
-    $stmt->execute();
-    $stmt->close();
-
-    // Récupérer les infos de l'interlocuteur
-    $stmt = $conn->prepare("SELECT * FROM users WHERE id = ?");
+if ($with_id && $with_id !== $user_id) {
+    $stmt = $conn->prepare("SELECT id, nom, username, photo, disponible FROM users WHERE id = ?");
     $stmt->bind_param("i", $with_id);
     $stmt->execute();
     $interlocuteur = $stmt->get_result()->fetch_assoc();
     $stmt->close();
 
-    // Récupérer les messages de la conversation
-    $stmt = $conn->prepare("
-        SELECT messages.*, users.nom, users.photo
-        FROM messages
-        JOIN users ON messages.expediteur_id = users.id
-        WHERE (expediteur_id = ? AND destinataire_id = ?)
-           OR (expediteur_id = ? AND destinataire_id = ?)
-        ORDER BY created_at ASC
-    ");
-    $stmt->bind_param("iiii", $user_id, $with_id, $with_id, $user_id);
-    $stmt->execute();
-    $messages = $stmt->get_result();
-    $stmt->close();
+    if ($interlocuteur) {
+        messages_marquer_lus($conn, $user_id, $with_id);
+        $messages = messages_conversation($conn, $user_id, $with_id);
+        $vu_jusqua = message_vu_jusqua($conn, $user_id, $with_id);
+
+        // « Contacter pour ce trajet » : le trajet doit appartenir à l'interlocuteur
+        $trajet_demande = (int)($_GET['trajet'] ?? 0);
+        if ($trajet_demande) {
+            $stmt = $conn->prepare("SELECT * FROM trajets WHERE id = ? AND user_id = ?");
+            $stmt->bind_param("ii", $trajet_demande, $with_id);
+            $stmt->execute();
+            $t = $stmt->get_result()->fetch_assoc();
+            $stmt->close();
+            if ($t) $trajet_cite = trajet_resume($t);
+        }
+    }
 }
 
 // ============================================================
-// LISTE DES CONVERSATIONS
-// On récupère toutes les personnes avec qui on a échangé
+// LISTE DES CONVERSATIONS : dernier message, heure, non lus
 // ============================================================
-$conversations = $conn->prepare("
-    SELECT DISTINCT 
-        users.id, users.nom, users.photo, users.username,
-        -- Nombre de messages non lus
-        (SELECT COUNT(*) FROM messages 
-         WHERE expediteur_id = users.id 
-         AND destinataire_id = ? 
-         AND lu = 0) as non_lus
-    FROM messages
-    JOIN users ON (
-        CASE 
-            WHEN messages.expediteur_id = ? THEN messages.destinataire_id = users.id
-            ELSE messages.expediteur_id = users.id
-        END
-    )
-    WHERE messages.expediteur_id = ? OR messages.destinataire_id = ?
-    ORDER BY non_lus DESC
+$stmt = $conn->prepare("
+    SELECT u.id, u.nom, u.photo, u.username,
+           m.contenu AS dernier, m.created_at AS date_dernier, m.expediteur_id AS dernier_de,
+           (SELECT COUNT(*) FROM messages WHERE expediteur_id = u.id AND destinataire_id = ? AND lu = 0) AS non_lus
+    FROM (
+        SELECT IF(expediteur_id = ?, destinataire_id, expediteur_id) AS autre, MAX(id) AS dernier_id
+        FROM messages
+        WHERE expediteur_id = ? OR destinataire_id = ?
+        GROUP BY autre
+    ) c
+    JOIN messages m ON m.id = c.dernier_id
+    JOIN users u ON u.id = c.autre
+    ORDER BY m.id DESC
 ");
-$conversations->bind_param("iiii", $user_id, $user_id, $user_id, $user_id);
-$conversations->execute();
-$convs = $conversations->get_result();
-$conversations->close();
+$stmt->bind_param("iiii", $user_id, $user_id, $user_id, $user_id);
+$stmt->execute();
+$convs = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+$stmt->close();
 
 $conn->close();
+
+// Rendu d'un avatar (photo ou initiale)
+function avatar_conv(array $u): string
+{
+    if (!empty($u['photo'])) {
+        return '<img src="uploads/' . e($u['photo']) . '" alt="">';
+    }
+    return e(strtoupper(mb_substr($u['nom'], 0, 1)));
+}
 ?>
 
 <!DOCTYPE html>
@@ -132,100 +100,102 @@ $conn->close();
 <section class="messagerie">
 
     <!-- Sur mobile : la liste OU la conversation ouverte, pas les deux -->
-    <div class="messagerie-container <?= ($with_id && !empty($interlocuteur)) ? 'conv-ouverte' : '' ?>">
+    <div class="messagerie-container <?= $interlocuteur ? 'conv-ouverte' : '' ?>">
 
         <!-- LISTE DES CONVERSATIONS -->
         <div class="conv-liste">
             <h3><i class="fa-solid fa-message"></i> Messages</h3>
+            <div class="conv-recherche">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="search" id="conv-filtre" placeholder="Rechercher une conversation" aria-label="Rechercher une conversation">
+            </div>
 
-            <?php if ($convs->num_rows > 0): ?>
-                <?php while($conv = $convs->fetch_assoc()): ?>
-                <a href="messagerie.php?with=<?= $conv['id'] ?>" 
-                   class="conv-item <?= ($with_id == $conv['id']) ? 'active' : '' ?>">
-                    
-                    <!-- Avatar -->
-                    <div class="conv-avatar">
-                        <?php if (!empty($conv['photo'])): ?>
-                            <img src="uploads/<?= htmlspecialchars($conv['photo']) ?>"
-                                 style="width:45px; height:45px; border-radius:50%; object-fit:cover;">
-                        <?php else: ?>
-                            <?= strtoupper(substr($conv['nom'], 0, 1)) ?>
-                        <?php endif; ?>
+            <?php if ($convs): ?>
+                <?php foreach ($convs as $conv): ?>
+                <a href="messagerie.php?with=<?= (int)$conv['id'] ?>"
+                   class="conv-item <?= $with_id == $conv['id'] ? 'active' : '' ?> <?= $conv['non_lus'] > 0 ? 'non-lue' : '' ?>"
+                   data-nom="<?= e(sans_accents($conv['nom'] . ' ' . ($conv['username'] ?? ''))) ?>">
+                    <div class="conv-avatar"><?= avatar_conv($conv) ?></div>
+                    <div class="conv-texte">
+                        <div class="conv-ligne1">
+                            <strong><?= e($conv['nom']) ?></strong>
+                            <span class="conv-heure"><?= e(heure_conversation($conv['date_dernier'])) ?></span>
+                        </div>
+                        <div class="conv-ligne2">
+                            <span class="conv-apercu"><?= (int)$conv['dernier_de'] === $user_id ? 'Toi : ' : '' ?><?= e(mb_strimwidth($conv['dernier'], 0, 60, '…')) ?></span>
+                            <?php if ($conv['non_lus'] > 0): ?>
+                                <span class="badge-nonlu"><?= (int)$conv['non_lus'] ?></span>
+                            <?php endif; ?>
+                        </div>
                     </div>
-
-                    <!-- Nom + badge non lus -->
-                    <div style="flex:1;">
-                        <strong><?= htmlspecialchars($conv['nom']) ?></strong>
-                        <p style="color:#94a3b8; font-size:12px; margin:2px 0 0;">
-                            @<?= htmlspecialchars($conv['username'] ?? '') ?>
-                        </p>
-                    </div>
-
-                    <!-- Badge non lus -->
-                    <?php if ($conv['non_lus'] > 0): ?>
-                        <span class="badge-nonlu"><?= $conv['non_lus'] ?></span>
-                    <?php endif; ?>
-
                 </a>
-                <?php endwhile; ?>
-            <?php else: ?>
-                <p style="color:#94a3b8; padding:20px; text-align:center;">
-                    Aucune conversation
-                </p>
+                <?php endforeach; ?>
+                <p class="conv-aucune" hidden>Aucune conversation trouvée</p>
+            <?php elseif (!$interlocuteur): ?>
+                <p class="conv-aucune">Aucune conversation pour l'instant.<br>Contacte un GP depuis une annonce.</p>
             <?php endif; ?>
         </div>
 
         <!-- CONVERSATION ACTIVE -->
         <div class="conv-messages">
-            <?php if ($with_id && $interlocuteur): ?>
+            <?php if ($interlocuteur): ?>
 
-                <!-- Header conversation -->
                 <div class="conv-header">
                     <a href="messagerie.php" class="conv-retour" aria-label="Retour aux conversations"><i class="fa-solid fa-arrow-left"></i></a>
-                    <div class="conv-avatar">
-                        <?php if (!empty($interlocuteur['photo'])): ?>
-                            <img src="uploads/<?= htmlspecialchars($interlocuteur['photo']) ?>"
-                                 style="width:45px; height:45px; border-radius:50%; object-fit:cover;">
-                        <?php else: ?>
-                            <?= strtoupper(substr($interlocuteur['nom'], 0, 1)) ?>
-                        <?php endif; ?>
-                    </div>
+                    <div class="conv-avatar"><?= avatar_conv($interlocuteur) ?></div>
                     <div>
-                        <strong><?= htmlspecialchars($interlocuteur['nom']) ?></strong>
-                        <p style="color:#94a3b8; font-size:12px; margin:0;">
-                            @<?= htmlspecialchars($interlocuteur['username'] ?? '') ?>
-                        </p>
+                        <a href="profil.php?id=<?= (int)$interlocuteur['id'] ?>" class="conv-nom"><?= e($interlocuteur['nom']) ?></a>
+                        <p class="conv-sous-titre">@<?= e($interlocuteur['username'] ?? '') ?></p>
                     </div>
                 </div>
 
-                <!-- Messages -->
-                <div class="messages-liste" id="messages-liste">
-                    <?php while($msg = $messages->fetch_assoc()): ?>
-                        <div class="message <?= ($msg['expediteur_id'] == $user_id) ? 'envoye' : 'recu' ?>">
-                            <p><?= htmlspecialchars($msg['contenu']) ?></p>
-                            <span class="msg-date">
-                                <?= date('d/m/Y H:i', strtotime($msg['created_at'])) ?>
-                            </span>
+                <!-- Messages : rendus ici, puis complétés en direct par script.js -->
+                <div class="messages-liste" id="messages-liste"
+                     data-with="<?= (int)$with_id ?>" data-vu="<?= (int)$vu_jusqua ?>">
+                    <?php $jour_precedent = null; ?>
+                    <?php foreach ($messages as $m): ?>
+                        <?php if ($m['jour'] !== $jour_precedent): $jour_precedent = $m['jour']; ?>
+                            <div class="msg-jour"><span><?= e($m['jour']) ?></span></div>
+                        <?php endif; ?>
+                        <div class="message <?= $m['moi'] ? 'envoye' : 'recu' ?>" data-id="<?= $m['id'] ?>" data-jour="<?= e($m['jour']) ?>">
+                            <?php if ($m['trajet']): $tr = $m['trajet']; ?>
+                                <a class="msg-trajet" href="<?= e($tr['lien']) ?>">
+                                    <span class="fi fi-<?= e($tr['pays'][0]) ?>"></span> <?= e($tr['titre']) ?> <span class="fi fi-<?= e($tr['pays'][1]) ?>"></span>
+                                    <small><?= e($tr['date']) ?> · <?= e($tr['prix']) ?></small>
+                                </a>
+                            <?php endif; ?>
+                            <p><?= nl2br(e($m['contenu'])) ?></p>
+                            <span class="msg-date"><?= e($m['heure']) ?></span>
                         </div>
-                    <?php endwhile; ?>
+                    <?php endforeach; ?>
+                    <?php if (!$messages): ?>
+                        <p class="conv-debut">Début de ta conversation avec <?= e($interlocuteur['nom']) ?>.</p>
+                    <?php endif; ?>
                 </div>
 
-                <!-- Formulaire d'envoi -->
-                <form action="messagerie.php" method="POST" class="msg-form">
+                <!-- Formulaire d'envoi (Entrée = envoyer, Maj+Entrée = nouvelle ligne) -->
+                <form action="messagerie.php" method="POST" class="msg-form" id="msg-form">
                     <?= csrf_field() ?>
-                    <input type="hidden" name="destinataire_id" value="<?= $with_id ?>">
-                    <input type="text" name="contenu" 
-                           placeholder="Écrire un message..." 
-                           autocomplete="off" required>
-                    <button type="submit">
-                        <i class="fa-solid fa-paper-plane"></i>
-                    </button>
+                    <input type="hidden" name="destinataire_id" value="<?= (int)$with_id ?>">
+                    <?php if ($trajet_cite): ?>
+                        <div class="msg-trajet-cite">
+                            <span><i class="fa-solid fa-plane"></i> À propos du trajet <strong><?= e($trajet_cite['titre']) ?></strong> du <?= e($trajet_cite['date']) ?></span>
+                            <button type="button" class="msg-trajet-retirer" aria-label="Ne plus citer ce trajet"><i class="fa-solid fa-xmark"></i></button>
+                            <input type="hidden" name="trajet_id" value="<?= (int)$trajet_cite['id'] ?>">
+                        </div>
+                    <?php endif; ?>
+                    <div class="msg-saisie">
+                        <textarea name="contenu" rows="1" maxlength="2000"
+                                  placeholder="<?= $trajet_cite ? 'Ex : Bonjour, il vous reste de la place pour 5 kg ?' : 'Écrire un message...' ?>"
+                                  autocomplete="off" required></textarea>
+                        <button type="submit" aria-label="Envoyer"><i class="fa-solid fa-paper-plane"></i></button>
+                    </div>
                 </form>
 
             <?php else: ?>
                 <div class="conv-vide">
-                    <i class="fa-solid fa-message" style="font-size:50px; color:#1e293b;"></i>
-                    <p>Sélectionne une conversation ou contacte un GP depuis son profil</p>
+                    <i class="fa-solid fa-comments"></i>
+                    <p>Sélectionne une conversation, ou contacte un GP depuis une annonce.</p>
                 </div>
             <?php endif; ?>
         </div>
@@ -235,12 +205,6 @@ $conn->close();
 </section>
 
 <?php include 'footer.php'; ?>
-
-<script>
-    // Auto-scroll vers le bas des messages
-    const liste = document.getElementById('messages-liste');
-    if (liste) liste.scrollTop = liste.scrollHeight;
-</script>
 
 </body>
 </html>

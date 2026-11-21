@@ -1,15 +1,16 @@
 <footer>
     <div class="footer-content">
         <div class="footer-logo">
-            <img src="images/SafeGP_logo.png" alt="logo" style="height: 70px; margin-bottom: 10px;">
+            <img src="images/SafeGP_logo.png" alt="logo" class="footer-logo-img">
             <h2>Safe<span class="gp">GP</span></h2>
-            <p>Envoyez vos colis facilement entre le Maroc et le Sénégal</p>
+            <p>Envoyez vos colis partout dans le monde avec des voyageurs de confiance.</p>
         </div>
 
         <div class="footer-liens">
             <h4>Liens utiles</h4>
             <ul>
                 <li><a href="index.php">Accueil</a></li>
+                <li><a href="search_trajet.php">Rechercher un trajet</a></li>
                 <li><a href="publier.php">Publier un trajet</a></li>
                 <li><a href="membres.php">Rechercher un membre</a></li>
                 <li><a href="retours.php">Donner mon avis</a></li>

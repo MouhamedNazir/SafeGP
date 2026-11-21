@@ -14,6 +14,7 @@ forcer_https_si_demande();
 $conn->set_charset('utf8mb4');
 
 require_once __DIR__ . '/csrf.php';      // démarre la session (cookie sécurisé)
+require_once __DIR__ . '/pays.php';
 require_once __DIR__ . '/fonctions.php';
 require_once __DIR__ . '/email.php';
 csrf_verify(); // bloque tout POST sans jeton CSRF valide

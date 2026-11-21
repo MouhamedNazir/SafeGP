@@ -14,7 +14,11 @@ const DEVISES = [
     'MAD' => ['DH', 'Dirham marocain (DH)'],
     'EUR' => ['€', 'Euro (€)'],
     'USD' => ['$', 'Dollar américain ($)'],
-    'XOF' => ['FCFA', 'Franc CFA (FCFA)'],
+    'XOF' => ['FCFA', 'Franc CFA - Afrique de l’Ouest'],
+    'XAF' => ['FCFA', 'Franc CFA - Afrique centrale'],
+    'GBP' => ['£', 'Livre sterling (£)'],
+    'CAD' => ['$ CA', 'Dollar canadien ($ CA)'],
+    'CHF' => ['CHF', 'Franc suisse (CHF)'],
 ];
 
 // "50.00", "EUR" → "50 €/kg"
@@ -78,7 +82,9 @@ function trajet_depuis_post(): array
 
     return [
         'depart'             => trim($_POST['depart'] ?? ''),
+        'pays_depart'        => strtoupper(trim($_POST['pays_depart'] ?? '')),
         'arrivee'            => trim($_POST['arrivee'] ?? ''),
+        'pays_arrivee'       => strtoupper(trim($_POST['pays_arrivee'] ?? '')),
         'date_depart'        => $_POST['date_depart'] ?? '',
         'heure_depart'       => vide_en_null($_POST['heure_depart'] ?? ''),
         'date_arrivee'       => $_POST['date_arrivee'] ?? '',
@@ -107,6 +113,9 @@ function trajet_valider(array &$t, array $contacts): string
 
     if ($t['depart'] === '' || $t['arrivee'] === '') {
         return "Les villes de départ et d'arrivée sont obligatoires.";
+    }
+    if (!isset(PAYS[$t['pays_depart']]) || !isset(PAYS[$t['pays_arrivee']])) {
+        return "Choisis le pays de départ et le pays d'arrivée.";
     }
     if (!strtotime($t['date_depart']) || !strtotime($t['date_arrivee'])) {
         return "Les dates de départ et d'arrivée sont obligatoires.";
@@ -371,4 +380,153 @@ function supprimer_utilisateur(mysqli $conn, int $id): bool
         @unlink(__DIR__ . '/uploads/' . $u['photo']);
     }
     return true;
+}
+
+// ============================================================
+// MESSAGERIE
+// ============================================================
+const MOIS_FR = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
+
+// "Aujourd'hui", "Hier", "12 déc." ou "12 déc. 2025"
+function libelle_jour(string $date_heure): string
+{
+    $jour = date('Y-m-d', strtotime($date_heure));
+    if ($jour === date('Y-m-d')) return "Aujourd'hui";
+    if ($jour === date('Y-m-d', strtotime('-1 day'))) return 'Hier';
+    $ts = strtotime($jour);
+    $txt = (int)date('j', $ts) . ' ' . MOIS_FR[(int)date('n', $ts) - 1];
+    return date('Y', $ts) === date('Y') ? $txt : $txt . ' ' . date('Y', $ts);
+}
+
+// Heure courte pour la liste des conversations : "14:05", "Hier", "12 déc."
+function heure_conversation(string $date_heure): string
+{
+    return date('Y-m-d', strtotime($date_heure)) === date('Y-m-d')
+        ? date('H:i', strtotime($date_heure))
+        : libelle_jour($date_heure);
+}
+
+// Résumé d'un trajet pour l'afficher dans la messagerie
+function trajet_resume(array $t): array
+{
+    return [
+        'id'    => (int)$t['id'],
+        'titre' => $t['depart'] . ' → ' . $t['arrivee'],
+        'pays'  => [strtolower((string)$t['pays_depart']), strtolower((string)$t['pays_arrivee'])],
+        'date'  => date('d/m/Y', strtotime($t['date_depart'])),
+        'prix'  => prix_kilo_fr($t['prix_kilo'], $t['devise'] ?? 'MAD'),
+        'lien'  => 'profil.php?id=' . (int)$t['user_id'] . '#trajet-' . (int)$t['id'],
+    ];
+}
+
+// Message (ligne de la base + trajet joint) → données d'affichage,
+// utilisées à la fois par le rendu PHP et par le JavaScript (JSON)
+function message_affichage(array $m, int $moi): array
+{
+    return [
+        'id'      => (int)$m['id'],
+        'moi'     => (int)$m['expediteur_id'] === $moi,
+        'contenu' => $m['contenu'],
+        'heure'   => date('H:i', strtotime($m['created_at'])),
+        'jour'    => libelle_jour($m['created_at']),
+        'lu'      => (bool)$m['lu'],
+        'trajet'  => !empty($m['t_id']) ? trajet_resume([
+            'id' => $m['t_id'], 'depart' => $m['t_depart'], 'arrivee' => $m['t_arrivee'],
+            'pays_depart' => $m['t_pays_depart'], 'pays_arrivee' => $m['t_pays_arrivee'],
+            'date_depart' => $m['t_date_depart'], 'prix_kilo' => $m['t_prix_kilo'],
+            'devise' => $m['t_devise'], 'user_id' => $m['t_user_id'],
+        ]) : null,
+    ];
+}
+
+// Messages d'une conversation (tous, ou seulement ceux après $apres_id)
+function messages_conversation(mysqli $conn, int $moi, int $autre, int $apres_id = 0): array
+{
+    $stmt = $conn->prepare("
+        SELECT m.*, t.id AS t_id, t.depart AS t_depart, t.arrivee AS t_arrivee,
+               t.pays_depart AS t_pays_depart, t.pays_arrivee AS t_pays_arrivee,
+               t.date_depart AS t_date_depart, t.prix_kilo AS t_prix_kilo,
+               t.devise AS t_devise, t.user_id AS t_user_id
+        FROM messages m
+        LEFT JOIN trajets t ON t.id = m.trajet_id
+        WHERE ((m.expediteur_id = ? AND m.destinataire_id = ?)
+            OR (m.expediteur_id = ? AND m.destinataire_id = ?))
+          AND m.id > ?
+        ORDER BY m.id ASC");
+    $stmt->bind_param("iiiii", $moi, $autre, $autre, $moi, $apres_id);
+    $stmt->execute();
+    $res = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+    return array_map(fn($m) => message_affichage($m, $moi), $res);
+}
+
+// Marque comme lus les messages reçus de $autre
+function messages_marquer_lus(mysqli $conn, int $moi, int $autre): void
+{
+    $stmt = $conn->prepare("UPDATE messages SET lu = 1 WHERE expediteur_id = ? AND destinataire_id = ? AND lu = 0");
+    $stmt->bind_param("ii", $autre, $moi);
+    $stmt->execute();
+    $stmt->close();
+}
+
+// Id du dernier de MES messages que l'autre a lu (pour l'indicateur « Vu »)
+function message_vu_jusqua(mysqli $conn, int $moi, int $autre): int
+{
+    $stmt = $conn->prepare("SELECT COALESCE(MAX(id), 0) FROM messages WHERE expediteur_id = ? AND destinataire_id = ? AND lu = 1");
+    $stmt->bind_param("ii", $moi, $autre);
+    $stmt->execute();
+    $id = (int)$stmt->get_result()->fetch_row()[0];
+    $stmt->close();
+    return $id;
+}
+
+// Envoie un message (+ e-mail de notification au premier non lu).
+// Renvoie l'id du message, ou un texte d'erreur.
+function message_envoyer(mysqli $conn, int $moi, string $moi_nom, int $destinataire_id, string $contenu, ?int $trajet_id)
+{
+    $contenu = trim($contenu);
+    if ($contenu === '') return "Message vide.";
+    if ($destinataire_id === $moi) return "Tu ne peux pas t'écrire à toi-même.";
+    $contenu = mb_substr($contenu, 0, 2000);
+
+    $stmt = $conn->prepare("SELECT id, nom, email, email_verifie, notif_email,
+            (SELECT COUNT(*) FROM messages WHERE expediteur_id = ? AND destinataire_id = users.id AND lu = 0) AS deja_non_lus
+        FROM users WHERE id = ?");
+    $stmt->bind_param("ii", $moi, $destinataire_id);
+    $stmt->execute();
+    $destinataire = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    if (!$destinataire) return "Ce membre n'existe plus.";
+
+    // Le trajet cité doit appartenir à l'un des deux interlocuteurs
+    if ($trajet_id) {
+        $stmt = $conn->prepare("SELECT id FROM trajets WHERE id = ? AND user_id IN (?, ?)");
+        $stmt->bind_param("iii", $trajet_id, $moi, $destinataire_id);
+        $stmt->execute();
+        if (!$stmt->get_result()->fetch_row()) $trajet_id = null;
+        $stmt->close();
+    }
+
+    $stmt = $conn->prepare("INSERT INTO messages (expediteur_id, destinataire_id, trajet_id, contenu) VALUES (?, ?, ?, ?)");
+    $stmt->bind_param("iiis", $moi, $destinataire_id, $trajet_id, $contenu);
+    $stmt->execute();
+    $id = $stmt->insert_id;
+    $stmt->close();
+
+    // Notification par e-mail : seulement pour le premier message non lu
+    // de cet expéditeur, pour ne pas inonder la boîte du destinataire
+    if ($destinataire['notif_email'] && $destinataire['email_verifie'] && (int)$destinataire['deja_non_lus'] === 0) {
+        $html = email_gabarit(
+            'Nouveau message de ' . $moi_nom,
+            '<p>Bonjour ' . htmlspecialchars($destinataire['nom']) . ',</p>'
+            . '<p><strong>' . htmlspecialchars($moi_nom) . '</strong> t’a envoyé un message sur SafeGP :</p>'
+            . '<blockquote style="border-left:3px solid #f97316;margin:0;padding:5px 15px;color:#334155;">'
+            . nl2br(htmlspecialchars(mb_strimwidth($contenu, 0, 300, '…'))) . '</blockquote>'
+            . '<p style="font-size:12px;color:#64748b;">Tu peux désactiver ces e-mails dans « Mon profil ».</p>',
+            'Répondre',
+            url_site() . '/messagerie.php?with=' . $moi
+        );
+        email_envoyer($destinataire['email'], 'Nouveau message de ' . $moi_nom . ' - SafeGP', $html);
+    }
+    return $id;
 }
