@@ -10,6 +10,7 @@
     <ul>
         <li><a href="index.php">Accueil</a></li>
         <li><a href="search_trajet.php">Rechercher</a></li>
+        <li><a href="membres.php"><i class="fa-solid fa-users"></i> Membres</a></li>
         <li><a href="publier.php">Publier</a></li>
         <li><a href="messagerie.php"><i class="fa-solid fa-message"></i> Messages</a></li>
 
@@ -32,8 +33,11 @@
                     <li><a href="publier.php"><i class="fa-solid fa-plus"></i> Publier</a></li>
                     <hr style="border-color:#0f172a;">
                     <?php if (!empty($nav_is_admin)): ?>
-                        <li><a href="admin.php"><i class="fa-solid fa-shield"></i> Admin</a></li>
+                        <li><a href="admin.php"><i class="fa-solid fa-shield"></i> Admin
+                            <?php if (!empty($nav_retours_non_lus)): ?><span class="badge-nonlu" title="Retours clients non lus"><?= (int)$nav_retours_non_lus ?></span><?php endif; ?>
+                        </a></li>
                     <?php endif; ?>
+                    <li><a href="retours.php"><i class="fa-solid fa-lightbulb"></i> Donner mon avis</a></li>
                     <li><a href="deconnexion.php" style="color:#f97316;"><i class="fa-solid fa-right-from-bracket"></i> Déconnexion</a></li>
                 </ul>
             </li>

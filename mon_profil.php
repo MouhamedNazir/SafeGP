@@ -82,24 +82,36 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_FILES['photo']) && $_FILES['
 // Ce formulaire est différent du formulaire photo
 // On le détecte avec isset($_POST['nom'])
 // ============================================================
+$contacts_valeurs = contacts_profil($conn, $user_id);
+
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['nom'])) {
     $nom = trim($_POST['nom']);
     
     // On force le username en minuscule pour éviter les doublons
     $username = strtolower(trim($_POST['username']));
-    $whatsapp = trim($_POST['whatsapp']);
+    $disponible = !empty($_POST['disponible']) ? 1 : 0;
+    $joignable_debut = vide_en_null($_POST['joignable_debut'] ?? '');
+    $joignable_fin = vide_en_null($_POST['joignable_fin'] ?? '');
+    $contacts_valeurs = contacts_depuis_post($erreur);
+    $format_heure = '/^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/';
+
+    if ($erreur) {
+        // erreur déjà renseignée par contacts_depuis_post()
 
     // Validation username — minimum 3 caractères
-    if (strlen($username) < 3) {
+    } elseif (strlen($username) < 3) {
         $erreur = "Le nom d'utilisateur doit faire au moins 3 caractères.";
 
     // Validation username — que lettres, chiffres et _
     } elseif (!preg_match('/^[a-z0-9_]+$/', $username)) {
         $erreur = "Le nom d'utilisateur ne peut contenir que des lettres, chiffres et _.";
 
-    // Validation whatsapp — seulement si renseigné
-    } elseif (!empty($whatsapp) && !preg_match('/^[\+0-9\s]{8,15}$/', $whatsapp)) {
-        $erreur = "Numéro WhatsApp invalide.";
+    // Horaires joignable : les deux ou aucun
+    } elseif (($joignable_debut === null) !== ($joignable_fin === null)) {
+        $erreur = "Indique l'heure de début et l'heure de fin où tu es joignable (ou laisse les deux vides).";
+    } elseif (($joignable_debut && !preg_match($format_heure, $joignable_debut))
+           || ($joignable_fin && !preg_match($format_heure, $joignable_fin))) {
+        $erreur = "Horaire invalide.";
 
     } else {
         // On vérifie que le username n'est pas déjà pris par quelqu'un d'autre
@@ -113,10 +125,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['nom'])) {
             $erreur = "Ce nom d'utilisateur est déjà pris.";
         } else {
             // Tout est bon → on met à jour les infos
-            $stmt = $conn->prepare("UPDATE users SET nom = ?, username = ?, whatsapp = ? WHERE id = ?");
-            $stmt->bind_param("sssi", $nom, $username, $whatsapp, $user_id);
+            $stmt = $conn->prepare("UPDATE users SET nom = ?, username = ?, disponible = ?, joignable_debut = ?, joignable_fin = ? WHERE id = ?");
+            $stmt->bind_param("ssissi", $nom, $username, $disponible, $joignable_debut, $joignable_fin, $user_id);
 
             if ($stmt->execute()) {
+                contacts_enregistrer($conn, $user_id, null, $contacts_valeurs);
                 $success = "Profil mis à jour !";
                 
                 // On met à jour la session pour que la navbar affiche le nouveau nom
@@ -125,7 +138,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['nom'])) {
                 // On met à jour le tableau $user pour afficher les nouvelles infos
                 $user['nom'] = $nom;
                 $user['username'] = $username;
-                $user['whatsapp'] = $whatsapp;
+                $user['disponible'] = $disponible;
+                $user['joignable_debut'] = $joignable_debut;
+                $user['joignable_fin'] = $joignable_fin;
             } else {
                 $erreur = "Erreur lors de la mise à jour.";
             }
@@ -151,12 +166,12 @@ $conn->close();
         <h2>Mon profil</h2>
 
         <?php if ($success): ?>
-            <p class="success"><i class="fa-solid fa-circle-check" style="color:#16a34a;"></i> <?= $success ?></p>
+            <p class="success"><i class="fa-solid fa-circle-check" style="color:#16a34a;"></i> <?= e($success) ?></p>
         <?php endif; ?>
 
         <?php if ($erreur): ?>
             
-            <p class="erreur" ><i class="fa-solid fa-circle-xmark" style="color: white;"></i> <?= $erreur ?></p>
+            <p class="erreur" ><i class="fa-solid fa-circle-xmark" style="color: white;"></i> <?= e($erreur) ?></p>
         <?php endif; ?>
 
         <!-- Avatar + infos de base -->
@@ -212,13 +227,30 @@ $conn->close();
             </div>
 
             <div class="form-group">
-                <label>Numéro WhatsApp</label>
-                <input type="tel" name="whatsapp" 
-                       value="<?= htmlspecialchars($user['whatsapp'] ?? '') ?>"
-                       placeholder="Ex: +212 6 12 34 56 78">
-                <!-- Ce numéro apparaîtra sur les annonces du GP -->
-                <small style="color:#94a3b8;">Ce numéro sera visible sur tes annonces</small>
+                <label>Mes numéros WhatsApp</label>
+                <?php include 'contacts_champs.php'; ?>
+                <small style="color:#94a3b8;">Ces numéros seront visibles sur tes annonces.</small>
             </div>
+
+            <h3 style="color:#f97316; margin:30px 0 20px;">Ma disponibilité</h3>
+
+            <label class="case-a-cocher">
+                <input type="checkbox" name="disponible" value="1" <?= $user['disponible'] ? 'checked' : '' ?>>
+                Je prends des colis en ce moment
+            </label>
+            <small style="color:#94a3b8; display:block; margin:-10px 0 20px;">Décoché, ton profil affiche « Indisponible pour le moment » et tu n'apparais plus dans les GPs disponibles de l'accueil.</small>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Joignable de</label>
+                    <input type="time" name="joignable_debut" value="<?= e(substr((string)$user['joignable_debut'], 0, 5)) ?>">
+                </div>
+                <div class="form-group">
+                    <label>à</label>
+                    <input type="time" name="joignable_fin" value="<?= e(substr((string)$user['joignable_fin'], 0, 5)) ?>">
+                </div>
+            </div>
+            <small style="color:#94a3b8; display:block; margin:-10px 0 20px;">Plage horaire où les clients peuvent t'appeler (facultatif).</small>
 
             <button type="submit" class="btn-publier">Sauvegarder</button>
 

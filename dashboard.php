@@ -34,8 +34,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['supprimer'])) {
 $stmt = $conn->prepare("SELECT * FROM trajets WHERE user_id = ? ORDER BY date_depart ASC");
 $stmt->bind_param("i", $user_id);
 $stmt->execute();
-$trajets = $stmt->get_result();
+$trajets = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
+
+$contacts = contacts_pour_trajets($conn, $trajets);
+$quota = quota_publication($conn, $user_id);
 
 $conn->close();
 ?>
@@ -53,92 +56,51 @@ $conn->close();
         <h2>Mes trajets</h2>
 
         <!-- Message de succès après suppression ou modification -->
+        <?php if (isset($_GET['erreur']) && $_GET['erreur'] == 'kilos'): ?>
+            <p class="erreur"><i class="fa-solid fa-circle-xmark" style="color:white;"></i> Les kilos restants doivent être entre 0 et la capacité totale.</p>
+        <?php endif; ?>
+
         <?php if (isset($_GET['success'])): ?>
             <p class="success">
                 <i class="fa-solid fa-circle-check" style="color:#16a34a;"></i>
                 <?php if ($_GET['success'] == 'supprime') echo "Trajet supprimé !"; ?>
                 <?php if ($_GET['success'] == 'modifie') echo "Trajet modifié !"; ?>
+                <?php if ($_GET['success'] == 'kilos') echo "Trajet mis à jour !"; ?>
             </p>
         <?php endif; ?>
 
-        <a href="publier.php" class="btn-contact" style="display:inline-block; margin-bottom:30px;">
+        <a href="publier.php" class="btn-contact" style="display:inline-block; margin-bottom:15px;">
             + Publier un nouveau trajet
         </a>
+        <?php if ($quota['illimite']): ?>
+            <p class="quota quota-premium"><i class="fa-solid fa-crown"></i> Compte premium : publications illimitées</p>
+        <?php else: ?>
+            <p class="quota <?= $quota['restantes'] <= 0 ? 'quota-atteint' : '' ?>"><i class="fa-solid fa-gauge"></i>
+                Compte gratuit : <?= $quota['utilisees'] ?> / <?= FREEMIUM_LIMITE_MOIS ?> publications ce mois-ci</p>
+        <?php endif; ?>
 
-        <?php if ($trajets->num_rows > 0): ?>
+        <?php if ($trajets): ?>
 
-            <?php while($row = $trajets->fetch_assoc()): ?>
+            <?php foreach ($trajets as $row): ?>
                 <div class="annonce">
 
-                    <!-- Header : trajet + badge statut + prix -->
-                    <div class="annonce-header">
-                        <span class="trajet-titre">
-                            <i class="fa-solid fa-plane-departure"></i>
-                            <?= htmlspecialchars($row['depart']) ?>
-                            →
-                            <i class="fa-solid fa-plane-arrival"></i>
-                            <?= htmlspecialchars($row['arrivee']) ?>
-                        </span>
+                    <?php $avec_gp = false; include 'trajet_infos.php'; ?>
 
-                        <div style="display:flex; gap:10px; align-items:center;">
-                            <?php
-                                // Couleur du badge selon le statut
-                                $couleurs = [
-                                    'disponible' => '#16a34a',
-                                    'en_route'   => '#f97316',
-                                    'arrivé'     => '#94a3b8'
-                                ];
-                                $couleur = $couleurs[$row['statut']] ?? '#94a3b8';
-                            ?>
-                            <span style="background-color:<?= $couleur ?>; padding:4px 12px; border-radius:20px; font-size:13px;">
-                                <?= htmlspecialchars($row['statut']) ?>
-                            </span>
-                            <!-- Prix — une seule fois ici -->
-                            <span class="prix"><?= htmlspecialchars($row['prix_kilo']) ?> MAD/kg</span>
-                        </div>
+                    <!-- Numéros affichés sur cette annonce -->
+                    <?php if (!empty($contacts[$row['id']])): ?>
+                    <div class="contacts-annonce">
+                        <span><i class="fa-brands fa-whatsapp"></i> Affiché sur l'annonce :</span>
+                        <?php foreach ($contacts[$row['id']] as $c): ?>
+                            <span class="contact-puce"><?= e($c['nom']) ?> · <?= e($c['numero']) ?></span>
+                        <?php endforeach; ?>
                     </div>
-
-                    <!-- Body : détails du trajet -->
-                    <div class="annonce-body">
-
-                        <div class="info-ligne">
-                            <span><i class="fa-solid fa-calendar"></i> Départ :</span>
-                            <span><?= date('d/m/Y', strtotime($row['date_depart'])) ?></span>
-                        </div>
-
-                        <div class="info-ligne">
-                            <span><i class="fa-solid fa-calendar"></i> Arrivée :</span>
-                            <span><?= date('d/m/Y', strtotime($row['date_arrivee'])) ?></span>
-                        </div>
-
-                        <?php if (!empty($row['point_depot'])): ?>
-                        <div class="info-ligne">
-                            <span><i class="fa-solid fa-box"></i> Dépôt :</span>
-                            <span><?= htmlspecialchars($row['point_depot']) ?></span>
-                        </div>
-                        <?php endif; ?>
-
-                        <?php if (!empty($row['point_reception'])): ?>
-                        <div class="info-ligne">
-                            <span><i class="fa-solid fa-location-dot"></i> Réception :</span>
-                            <span><?= htmlspecialchars($row['point_reception']) ?></span>
-                        </div>
-                        <?php endif; ?>
-
-                        <?php if (!empty($row['commentaire'])): ?>
-                        <div class="info-ligne">
-                            <span><i class="fa-solid fa-comment"></i> Commentaire :</span>
-                            <span><?= htmlspecialchars($row['commentaire']) ?></span>
-                        </div>
-                        <?php endif; ?>
-
-                    </div>
+                    <?php endif; ?>
 
                     <!-- Footer : changer statut + modifier + supprimer -->
                     <div class="annonce-footer" style="display:flex; gap:10px; flex-wrap:wrap;">
 
                         <!-- Formulaire pour changer le statut du trajet -->
-                        <form action="changer_statut.php" method="POST" style="display:flex; gap:10px;">
+                        <form action="changer_statut.php" method="POST" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
                             <?= csrf_field() ?>
                             <input type="hidden" name="id_trajet" value="<?= $row['id'] ?>">
                             <select name="statut" style="padding:8px; border-radius:5px; background-color:#0f172a; color:white; border:none;">
@@ -147,6 +109,13 @@ $conn->close();
                                 <option value="en_route" <?= $row['statut'] == 'en_route' ? 'selected' : '' ?>>en route</option>
                                 <option value="arrivé" <?= $row['statut'] == 'arrivé' ? 'selected' : '' ?>>arrivé</option>
                             </select>
+                            <?php if ($row['kilos_total'] !== null): ?>
+                                <label class="kilos-maj" title="Kilos encore disponibles">
+                                    <input type="number" name="kilos_restants" step="0.1" min="0" max="<?= e($row['kilos_total']) ?>"
+                                           value="<?= e($row['kilos_restants']) ?>">
+                                    / <?= e($row['kilos_total'] + 0) ?> kg
+                                </label>
+                            <?php endif; ?>
                             <button type="submit" class="btn-contact">Mettre à jour</button>
                         </form>
 
@@ -171,7 +140,7 @@ $conn->close();
                     </div>
 
                 </div>
-            <?php endwhile; ?>
+            <?php endforeach; ?>
 
         <?php else: ?>
             <!-- Message si aucun trajet publié -->

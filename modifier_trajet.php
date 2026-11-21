@@ -24,38 +24,46 @@ if (!$trajet) {
     exit();
 }
 
+// Valeurs affichées : celles du trajet, ou celles envoyées si erreur
+$t = $trajet;
+$contacts_valeurs = $trajet['pour_autrui'] ? contacts_trajet($conn, $id_trajet) : [];
+$avec_kilos_restants = true;
+
 // Traitement du formulaire
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $depart = trim($_POST['depart']);
-    $arrivee = trim($_POST['arrivee']);
-    $date_depart = $_POST['date_depart'];
-    $date_arrivee = $_POST['date_arrivee'];
-    $prix_kilo = $_POST['prix_kilo'];
-    $telephone = trim($_POST['telephone']);
-    $commentaire = trim($_POST['commentaire']);
-    $point_depot = trim($_POST['point_depot']);
-    $point_reception = trim($_POST['point_reception']);
+    $t = trajet_depuis_post();
+    $contacts_valeurs = contacts_depuis_post($erreur);
+    if (!$erreur) {
+        // Un trajet déjà commencé peut garder sa date de départ passée
+        if ($t['date_depart'] < date('Y-m-d') && $t['date_depart'] === $trajet['date_depart']) {
+            $date_reelle = $t['date_depart'];
+            $t['date_depart'] = date('Y-m-d');
+            $erreur = trajet_valider($t, $contacts_valeurs);
+            $t['date_depart'] = $date_reelle;
+        } else {
+            $erreur = trajet_valider($t, $contacts_valeurs);
+        }
+    }
 
-    // Validations
-    if (!empty($telephone) && !preg_match('/^[\+0-9\s]{8,15}$/', $telephone)) {
-        $erreur = "Numéro de téléphone invalide.";
-    } elseif ($date_depart < date('Y-m-d')) {
-        $erreur = "La date de départ ne peut pas être dans le passé.";
-    } elseif ($date_arrivee < $date_depart) {
-        $erreur = "La date d'arrivée doit être après la date de départ.";
-    } else {
-        $stmt = $conn->prepare("UPDATE trajets SET 
-            depart = ?, arrivee = ?, date_depart = ?, date_arrivee = ?, 
-            prix_kilo = ?, telephone = ?, commentaire = ?, 
-            point_depot = ?, point_reception = ?
+    if (!$erreur) {
+        $stmt = $conn->prepare("UPDATE trajets SET
+            depart = ?, arrivee = ?, date_depart = ?, heure_depart = ?,
+            date_arrivee = ?, heure_arrivee = ?, date_limite_depot = ?,
+            prix_kilo = ?, kilos_total = ?, kilos_restants = ?, telephone = ?, commentaire = ?,
+            point_depot = ?, horaires_depot = ?, point_reception = ?, horaires_reception = ?,
+            pour_autrui = ?, voyageur_nom = ?
             WHERE id = ? AND user_id = ?");
-        $stmt->bind_param("ssssdssssii", 
-            $depart, $arrivee, $date_depart, $date_arrivee,
-            $prix_kilo, $telephone, $commentaire,
-            $point_depot, $point_reception,
+        $stmt->bind_param("sssssssdddssssssisii",
+            $t['depart'], $t['arrivee'], $t['date_depart'], $t['heure_depart'],
+            $t['date_arrivee'], $t['heure_arrivee'], $t['date_limite_depot'],
+            $t['prix_kilo'], $t['kilos_total'], $t['kilos_restants'], $t['telephone'], $t['commentaire'],
+            $t['point_depot'], $t['horaires_depot'], $t['point_reception'], $t['horaires_reception'],
+            $t['pour_autrui'], $t['voyageur_nom'],
             $id_trajet, $user_id);
 
         if ($stmt->execute()) {
+            // Numéros propres au trajet : gardés seulement s'il est publié pour autrui
+            contacts_enregistrer($conn, $user_id, $id_trajet, $t['pour_autrui'] ? $contacts_valeurs : []);
             header("Location: dashboard.php?success=modifie");
             exit();
         } else {
@@ -81,71 +89,12 @@ $conn->close();
         <h2>Modifier le trajet</h2>
 
         <?php if ($erreur): ?>
-            <p class="erreur"><i class="fa-solid fa-circle-xmark" style="color:white;"></i> <?= $erreur ?></p>
+            <p class="erreur"><i class="fa-solid fa-circle-xmark" style="color:white;"></i> <?= e($erreur) ?></p>
         <?php endif; ?>
 
         <form action="modifier_trajet.php?id=<?= $id_trajet ?>" method="POST">
             <?= csrf_field() ?>
-
-            <div class="form-group">
-                <label>Ville de départ</label>
-                <input type="text" name="depart" 
-                       value="<?= htmlspecialchars($trajet['depart']) ?>" required>
-            </div>
-
-            <div class="form-group">
-                <label>Ville d'arrivée</label>
-                <input type="text" name="arrivee" 
-                       value="<?= htmlspecialchars($trajet['arrivee']) ?>" required>
-            </div>
-
-            <div class="form-group">
-                <label>Date de départ</label>
-                <input type="date" name="date_depart" 
-                       min="<?= date('Y-m-d') ?>"
-                       value="<?= htmlspecialchars($trajet['date_depart']) ?>" required>
-            </div>
-
-            <div class="form-group">
-                <label>Date d'arrivée</label>
-                <input type="date" name="date_arrivee" 
-                       value="<?= htmlspecialchars($trajet['date_arrivee']) ?>" required>
-            </div>
-
-            <div class="form-group">
-                <label>Prix par kilo (€ ou MAD)</label>
-                <input type="number" name="prix_kilo" 
-                       step="0.01" min="0"
-                       value="<?= htmlspecialchars($trajet['prix_kilo']) ?>" required>
-            </div>
-
-            <div class="form-group">
-                <label>Numéro de téléphone</label>
-                <input type="tel" name="telephone" 
-                       value="<?= htmlspecialchars($trajet['telephone'] ?? '') ?>"
-                       placeholder="Ex: +212 6 12 34 56 78"
-                       pattern="[\+0-9\s]{8,15}">
-            </div>
-
-            <div class="form-group">
-                <label>Point de dépôt</label>
-                <input type="text" name="point_depot" 
-                       value="<?= htmlspecialchars($trajet['point_depot'] ?? '') ?>"
-                       placeholder="Ex: Gare de Casa-Voyageurs">
-            </div>
-
-            <div class="form-group">
-                <label>Point de réception</label>
-                <input type="text" name="point_reception" 
-                       value="<?= htmlspecialchars($trajet['point_reception'] ?? '') ?>"
-                       placeholder="Ex: Marché Sandaga, Dakar">
-            </div>
-
-            <div class="form-group">
-                <label>Commentaire</label>
-                <textarea name="commentaire" 
-                          placeholder="Ex: Poids max 20kg..."><?= htmlspecialchars($trajet['commentaire'] ?? '') ?></textarea>
-            </div>
+            <?php include 'trajet_champs.php'; ?>
 
             <button type="submit" class="btn-publier"><i class="fa-solid fa-floppy-disk"></i> Sauvegarder les modifications</button>
 

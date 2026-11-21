@@ -1,57 +1,98 @@
 -- ============================================================
--- SafeGP : structure de la base de données
--- Utilisation : créer la base puis importer ce fichier
---   CREATE DATABASE safegp CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
---   mysql -u root -p safegp < schema.sql   (ou "Importer" dans phpMyAdmin)
+-- SafeGP : structure complète de la base de données
+-- Nouvelle installation :
+--   1. créer une base "safegp" (utf8mb4)
+--   2. importer ce fichier (phpMyAdmin → Importer, ou mysql -u root -p safegp < schema.sql)
+-- Base existante : appliquer plutôt les fichiers de migrations/ dans l'ordre.
 -- Pour devenir admin après inscription :
 --   UPDATE users SET role = 'admin' WHERE email = 'ton@email.com';
 -- ============================================================
 
 SET NAMES utf8mb4;
+SET FOREIGN_KEY_CHECKS = 0;
 
-CREATE TABLE IF NOT EXISTS users (
-    id            INT UNSIGNED NOT NULL AUTO_INCREMENT,
-    nom           VARCHAR(100) NOT NULL,
-    username      VARCHAR(50)  DEFAULT NULL,
-    email         VARCHAR(190) NOT NULL,
-    mot_de_passe  VARCHAR(255) NOT NULL,          -- hash password_hash()
-    whatsapp      VARCHAR(30)  DEFAULT NULL,
-    photo         VARCHAR(255) DEFAULT NULL,      -- nom du fichier dans uploads/
-    role          ENUM('user', 'admin') NOT NULL DEFAULT 'user',
-    created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (id),
-    UNIQUE KEY uniq_email (email),
-    UNIQUE KEY uniq_username (username)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE `users` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `nom` varchar(100) NOT NULL,
+  `username` varchar(50) DEFAULT NULL,
+  `role` enum('user','admin') DEFAULT 'user',
+  `premium` tinyint(1) NOT NULL DEFAULT 0,
+  `disponible` tinyint(1) NOT NULL DEFAULT 1,
+  `joignable_debut` time DEFAULT NULL,
+  `joignable_fin` time DEFAULT NULL,
+  `whatsapp` varchar(20) DEFAULT NULL,
+  `email` varchar(150) NOT NULL,
+  `mot_de_passe` varchar(255) NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `photo` varchar(255) DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `email` (`email`),
+  UNIQUE KEY `username` (`username`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+CREATE TABLE `trajets` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `depart` varchar(100) DEFAULT NULL,
+  `arrivee` varchar(100) DEFAULT NULL,
+  `date_depart` date DEFAULT NULL,
+  `heure_depart` time DEFAULT NULL,
+  `date_arrivee` date DEFAULT NULL,
+  `heure_arrivee` time DEFAULT NULL,
+  `date_limite_depot` date DEFAULT NULL,
+  `prix_kilo` decimal(10,2) DEFAULT NULL,
+  `kilos_total` decimal(6,1) DEFAULT NULL,
+  `kilos_restants` decimal(6,1) DEFAULT NULL,
+  `statut` enum('disponible','en_route','arrivé') DEFAULT 'disponible',
+  `telephone` varchar(20) DEFAULT NULL,
+  `commentaire` text DEFAULT NULL,
+  `point_depot` varchar(255) DEFAULT NULL,
+  `horaires_depot` varchar(100) DEFAULT NULL,
+  `point_reception` varchar(255) DEFAULT NULL,
+  `horaires_reception` varchar(100) DEFAULT NULL,
+  `user_id` int(11) DEFAULT NULL,
+  `pour_autrui` tinyint(1) NOT NULL DEFAULT 0,
+  `voyageur_nom` varchar(100) DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `user_id` (`user_id`),
+  CONSTRAINT `trajets_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+CREATE TABLE `messages` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `expediteur_id` int(11) NOT NULL,
+  `destinataire_id` int(11) NOT NULL,
+  `contenu` text NOT NULL,
+  `lu` tinyint(4) DEFAULT 0,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `expediteur_id` (`expediteur_id`),
+  KEY `destinataire_id` (`destinataire_id`),
+  CONSTRAINT `messages_ibfk_1` FOREIGN KEY (`expediteur_id`) REFERENCES `users` (`id`),
+  CONSTRAINT `messages_ibfk_2` FOREIGN KEY (`destinataire_id`) REFERENCES `users` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+CREATE TABLE `contacts_whatsapp` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `user_id` int(11) NOT NULL,
+  `trajet_id` int(11) DEFAULT NULL,
+  `nom` varchar(100) NOT NULL,
+  `numero` varchar(20) NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `user_id` (`user_id`),
+  KEY `trajet_id` (`trajet_id`),
+  CONSTRAINT `contacts_trajet_fk` FOREIGN KEY (`trajet_id`) REFERENCES `trajets` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `contacts_user_fk` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+CREATE TABLE `retours` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `user_id` int(11) DEFAULT NULL,
+  `nom` varchar(100) DEFAULT NULL,
+  `email` varchar(150) DEFAULT NULL,
+  `type` enum('suggestion','probleme','autre') NOT NULL DEFAULT 'suggestion',
+  `message` text NOT NULL,
+  `lu` tinyint(1) NOT NULL DEFAULT 0,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `user_id` (`user_id`),
+  CONSTRAINT `retours_user_fk` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
-CREATE TABLE IF NOT EXISTS trajets (
-    id               INT UNSIGNED NOT NULL AUTO_INCREMENT,
-    user_id          INT UNSIGNED NOT NULL,
-    depart           VARCHAR(100) NOT NULL,
-    arrivee          VARCHAR(100) NOT NULL,
-    date_depart      DATE NOT NULL,
-    date_arrivee     DATE NOT NULL,
-    prix_kilo        DECIMAL(10,2) NOT NULL,      -- en MAD
-    telephone        VARCHAR(30)  DEFAULT NULL,
-    commentaire      TEXT         DEFAULT NULL,
-    point_depot      VARCHAR(255) DEFAULT NULL,
-    point_reception  VARCHAR(255) DEFAULT NULL,
-    statut           ENUM('disponible', 'en_route', 'arrivé') NOT NULL DEFAULT 'disponible',
-    created_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (id),
-    KEY idx_recherche (depart, arrivee),
-    CONSTRAINT fk_trajets_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE IF NOT EXISTS messages (
-    id               INT UNSIGNED NOT NULL AUTO_INCREMENT,
-    expediteur_id    INT UNSIGNED NOT NULL,
-    destinataire_id  INT UNSIGNED NOT NULL,
-    contenu          TEXT NOT NULL,
-    lu               TINYINT(1) NOT NULL DEFAULT 0,
-    created_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (id),
-    KEY idx_conversation (expediteur_id, destinataire_id),
-    CONSTRAINT fk_messages_expediteur   FOREIGN KEY (expediteur_id)   REFERENCES users (id) ON DELETE CASCADE,
-    CONSTRAINT fk_messages_destinataire FOREIGN KEY (destinataire_id) REFERENCES users (id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+SET FOREIGN_KEY_CHECKS = 1;

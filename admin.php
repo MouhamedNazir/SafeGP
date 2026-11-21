@@ -41,10 +41,36 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['supprimer_trajet'])) {
 // Supprimer un utilisateur
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['supprimer_user'])) {
     $id = (int)$_POST['supprimer_user'];
-    $stmt = $conn->prepare("DELETE FROM users WHERE id = ? AND role != 'admin'");
+
+    // On vérifie que ce n'est pas un admin
+    $stmt = $conn->prepare("SELECT role FROM users WHERE id = ?");
     $stmt->bind_param("i", $id);
     $stmt->execute();
+    $cible = $stmt->get_result()->fetch_assoc();
     $stmt->close();
+
+    if ($cible && $cible['role'] !== 'admin') {
+        // Les messages et trajets référencent l'utilisateur sans suppression
+        // en cascade : on les supprime d'abord, tout ou rien (transaction)
+        $conn->begin_transaction();
+        try {
+            foreach ([
+                "DELETE FROM messages WHERE expediteur_id = ? OR destinataire_id = ?",
+                "DELETE FROM trajets WHERE user_id = ? AND user_id = ?",
+                "DELETE FROM users WHERE id = ? AND id = ?",
+            ] as $sql) {
+                $stmt = $conn->prepare($sql);
+                $stmt->bind_param("ii", $id, $id);
+                $stmt->execute();
+                $stmt->close();
+            }
+            $conn->commit();
+        } catch (mysqli_sql_exception $ex) {
+            $conn->rollback();
+            header("Location: admin.php?erreur=suppression");
+            exit();
+        }
+    }
     header("Location: admin.php?success=user_supprime");
     exit();
 }
@@ -61,6 +87,39 @@ if (isset($_POST['changer_role'])) {
         $stmt->close();
     }
     header("Location: admin.php?success=role_modifie");
+    exit();
+}
+
+// Passer un utilisateur en premium (publications illimitées) ou en gratuit
+if (isset($_POST['changer_premium'])) {
+    $id = (int)$_POST['user_id'];
+    $premium = !empty($_POST['premium']) ? 1 : 0;
+    $stmt = $conn->prepare("UPDATE users SET premium = ? WHERE id = ?");
+    $stmt->bind_param("ii", $premium, $id);
+    $stmt->execute();
+    $stmt->close();
+    header("Location: admin.php?success=premium_modifie");
+    exit();
+}
+
+// Retours clients : marquer lu / non lu, ou supprimer
+if (isset($_POST['retour_lu'])) {
+    $id = (int)$_POST['retour_id'];
+    $lu = $_POST['retour_lu'] === '1' ? 1 : 0;
+    $stmt = $conn->prepare("UPDATE retours SET lu = ? WHERE id = ?");
+    $stmt->bind_param("ii", $lu, $id);
+    $stmt->execute();
+    $stmt->close();
+    header("Location: admin.php#retours");
+    exit();
+}
+if (isset($_POST['supprimer_retour'])) {
+    $id = (int)$_POST['supprimer_retour'];
+    $stmt = $conn->prepare("DELETE FROM retours WHERE id = ?");
+    $stmt->bind_param("i", $id);
+    $stmt->execute();
+    $stmt->close();
+    header("Location: admin.php?success=retour_supprime#retours");
     exit();
 }
 
@@ -81,8 +140,19 @@ $trajets_dispo = $conn->query("SELECT COUNT(*) as total FROM trajets WHERE statu
 // DONNÉES
 // ============================================================
 
-// Tous les utilisateurs
-$users = $conn->query("SELECT * FROM users ORDER BY created_at DESC");
+// Tous les utilisateurs, avec leurs publications du mois (limite freemium)
+$debut_mois = $conn->real_escape_string(date('Y-m-01 00:00:00'));
+$users = $conn->query("
+    SELECT users.*,
+           (SELECT COUNT(*) FROM trajets WHERE trajets.user_id = users.id AND trajets.created_at >= '$debut_mois') AS publications_mois
+    FROM users ORDER BY created_at DESC");
+
+// Retours clients, non lus d'abord
+$retours = $conn->query("
+    SELECT retours.*, users.username
+    FROM retours LEFT JOIN users ON retours.user_id = users.id
+    ORDER BY retours.lu ASC, retours.created_at DESC");
+$retours_non_lus = (int)$conn->query("SELECT COUNT(*) FROM retours WHERE lu = 0")->fetch_row()[0];
 
 // Tous les trajets
 $trajets = $conn->query("
@@ -114,8 +184,13 @@ $conn->close();
                 if ($_GET['success'] == 'trajet_supprime') echo "Trajet supprimé !";
                 if ($_GET['success'] == 'user_supprime') echo "Utilisateur supprimé !";
                 if ($_GET['success'] == 'role_modifie') echo "Rôle modifié !";
+                if ($_GET['success'] == 'premium_modifie') echo "Abonnement modifié !";
+                if ($_GET['success'] == 'retour_supprime') echo "Retour supprimé !";
             ?>
         </p>
+    <?php endif; ?>
+    <?php if (isset($_GET['erreur']) && $_GET['erreur'] == 'suppression'): ?>
+        <p class="erreur"><i class="fa-solid fa-circle-xmark"></i> Impossible de supprimer cet utilisateur.</p>
     <?php endif; ?>
 
     <!-- STATISTIQUES -->
@@ -135,6 +210,11 @@ $conn->close();
             <h3><?= $trajets_dispo ?></h3>
             <p>Trajets disponibles</p>
         </div>
+        <a href="#retours" class="stat-card" style="text-decoration:none; color:inherit;">
+            <i class="fa-solid fa-lightbulb" style="font-size:30px; color:#facc15;"></i>
+            <h3><?= $retours_non_lus ?></h3>
+            <p>Retours non lus</p>
+        </a>
     </div>
 
     <!-- UTILISATEURS -->
@@ -150,6 +230,7 @@ $conn->close();
                 <th>Username</th>
                 <th>Email</th>
                 <th>Rôle</th>
+                <th>Abonnement</th>
                 <th>Inscrit le</th>
                 <th>Actions</th>
             </tr>
@@ -173,6 +254,22 @@ $conn->close();
                             <option value="admin" <?= $user['role'] == 'admin' ? 'selected' : '' ?>>admin</option>
                         </select>
                     </form>
+                </td>
+                <td>
+                    <!-- Gratuit / premium -->
+                    <form action="admin.php" method="POST" style="display:inline;">
+                        <?= csrf_field() ?>
+                        <input type="hidden" name="changer_premium" value="1">
+                        <input type="hidden" name="user_id" value="<?= (int)$user['id'] ?>">
+                        <select name="premium" onchange="this.form.submit()"
+                                style="padding:4px; border-radius:5px; background-color:#0f172a; color:white; border:none;">
+                            <option value="0" <?= !$user['premium'] ? 'selected' : '' ?>>gratuit</option>
+                            <option value="1" <?= $user['premium'] ? 'selected' : '' ?>>premium</option>
+                        </select>
+                    </form>
+                    <?php if (!$user['premium'] && $user['role'] != 'admin'): ?>
+                        <small style="color:#94a3b8; display:block;"><?= (int)$user['publications_mois'] ?>/<?= FREEMIUM_LIMITE_MOIS ?> ce mois</small>
+                    <?php endif; ?>
                 </td>
                 <td><?= date('d/m/Y', strtotime($user['created_at'])) ?></td>
                 <td>
@@ -246,6 +343,53 @@ $conn->close();
             <?php endwhile; ?>
         </tbody>
     </table>
+
+    <!-- RETOURS CLIENTS -->
+    <h3 id="retours" style="color:#f97316; margin:40px 0 20px;">
+        <i class="fa-solid fa-lightbulb"></i> Retours clients
+        <?php if ($retours_non_lus): ?><span class="badge-nonlu"><?= $retours_non_lus ?></span><?php endif; ?>
+    </h3>
+
+    <?php if ($retours->num_rows === 0): ?>
+        <p style="color:#94a3b8;">Aucun retour pour l'instant. Les visiteurs peuvent t'en envoyer depuis la page <a href="retours.php">Donner mon avis</a>.</p>
+    <?php endif; ?>
+
+    <?php $types_retour = ['suggestion' => 'Suggestion', 'probleme' => 'Problème', 'autre' => 'Autre']; ?>
+    <?php while ($r = $retours->fetch_assoc()): ?>
+        <div class="retour-carte <?= $r['lu'] ? 'retour-lu' : '' ?>">
+            <div class="retour-entete">
+                <span class="retour-type type-<?= e($r['type']) ?>"><?= e($types_retour[$r['type']] ?? $r['type']) ?></span>
+                <span>
+                    <?php if ($r['user_id']): ?>
+                        <a href="profil.php?id=<?= (int)$r['user_id'] ?>">@<?= e($r['username'] ?? $r['nom']) ?></a>
+                    <?php else: ?>
+                        <?= e($r['nom'] ?: 'Anonyme') ?>
+                    <?php endif; ?>
+                    <?php if (!empty($r['email'])): ?>
+                        · <a href="mailto:<?= e($r['email']) ?>"><?= e($r['email']) ?></a>
+                    <?php endif; ?>
+                </span>
+                <span class="msg-date"><?= date('d/m/Y H:i', strtotime($r['created_at'])) ?></span>
+            </div>
+            <p class="retour-message"><?= nl2br(e($r['message'])) ?></p>
+            <div class="retour-actions">
+                <form action="admin.php" method="POST">
+                    <?= csrf_field() ?>
+                    <input type="hidden" name="retour_id" value="<?= (int)$r['id'] ?>">
+                    <input type="hidden" name="retour_lu" value="<?= $r['lu'] ? '0' : '1' ?>">
+                    <button type="submit" class="btn-lien">
+                        <i class="fa-solid <?= $r['lu'] ? 'fa-envelope' : 'fa-envelope-open' ?>"></i>
+                        <?= $r['lu'] ? 'Marquer non lu' : 'Marquer comme lu' ?>
+                    </button>
+                </form>
+                <form action="admin.php" method="POST" onsubmit="return confirm('Supprimer ce retour ?')">
+                    <?= csrf_field() ?>
+                    <input type="hidden" name="supprimer_retour" value="<?= (int)$r['id'] ?>">
+                    <button type="submit" class="btn-lien" style="color:#f97316;"><i class="fa-solid fa-trash"></i> Supprimer</button>
+                </form>
+            </div>
+        </div>
+    <?php endwhile; ?>
 
 </section>
 

@@ -8,7 +8,7 @@ $stmt = $conn->prepare("
            trajets.depart, trajets.arrivee
     FROM users 
     INNER JOIN trajets ON users.id = trajets.user_id
-    WHERE trajets.statut = 'disponible'
+    WHERE trajets.statut = 'disponible' AND users.disponible = 1
     GROUP BY users.id
     ORDER BY trajets.id DESC
     LIMIT 6

@@ -8,6 +8,7 @@
 // ============================================================
 
 require_once __DIR__ . '/csrf.php'; // démarre la session
+require_once __DIR__ . '/fonctions.php';
 csrf_verify(); // bloque tout POST sans jeton CSRF valide
 
 // Rôle de l'utilisateur connecté, lu en base (pas seulement en session)
@@ -20,4 +21,10 @@ if (isset($_SESSION['user_id'])) {
     $check_role = $check_admin->get_result()->fetch_assoc();
     $check_admin->close();
     $nav_is_admin = ($check_role['role'] ?? '') === 'admin';
+}
+
+// Pour l'admin : nombre de retours clients non lus (badge dans la navbar)
+$nav_retours_non_lus = 0;
+if ($nav_is_admin) {
+    $nav_retours_non_lus = (int)$conn->query("SELECT COUNT(*) FROM retours WHERE lu = 0")->fetch_row()[0];
 }

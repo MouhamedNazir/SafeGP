@@ -27,15 +27,24 @@ if (!$user) {
 $stmt2 = $conn->prepare("SELECT * FROM trajets WHERE user_id = ? ORDER BY date_depart ASC");
 $stmt2->bind_param("i", $id);
 $stmt2->execute();
-$trajets = $stmt2->get_result();
+$trajets = $stmt2->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt2->close();
+
+// Numéros WhatsApp : ceux du profil + ceux propres aux trajets publiés pour autrui
+$contacts_gp = contacts_profil($conn, $id);
+$contacts = contacts_pour_trajets($conn, $trajets);
+$conn->close();
+
+// Aperçu du lien quand on partage ce profil (WhatsApp, Facebook...)
+$og_title = $user['nom'] . " — GP sur SafeGP";
+$og_description = "Voir les trajets de " . $user['nom'] . " et lui confier vos colis entre le Maroc et le Sénégal.";
 ?>
 
 <!DOCTYPE html>
 <html lang="fr">
 <head>
     <?php include 'head.php'; ?>
-    <title>Profil - <?= htmlspecialchars($user['nom']) ?></title>
+    <title>Profil - <?= e($user['nom']) ?></title>
 </head>
 <body>
 <?php include 'navbar.php'; ?>
@@ -45,113 +54,63 @@ $stmt2->close();
         <div class="profil-header">
 
             <?php if (isset($_SESSION['user_id']) && $_SESSION['user_id'] != $user['id']): ?>
-                <a href="messagerie.php?with=<?= $user['id'] ?>" class="btn-contact">
+                <a href="messagerie.php?with=<?= (int)$user['id'] ?>" class="btn-contact">
                     <i class="fa-solid fa-message"></i> Contacter
                 </a>
             <?php endif; ?>
 
             <div class="profil-avatar">
                 <?php if (!empty($user['photo'])): ?>
-                    <img src="uploads/<?= htmlspecialchars($user['photo']) ?>" 
-                         alt="photo" 
+                    <img src="uploads/<?= e($user['photo']) ?>"
+                         alt="photo"
                          style="width:70px; height:70px; border-radius:50%; object-fit:cover;">
                 <?php else: ?>
-                    <?= strtoupper(substr($user['nom'], 0, 1)) ?>
+                    <?= e(strtoupper(mb_substr($user['nom'], 0, 1))) ?>
                 <?php endif; ?>
             </div>
             <div>
-                <h2><?= htmlspecialchars($user['nom']) ?></h2>
+                <h2><?= e($user['nom']) ?></h2>
                 <?php if (!empty($user['username'])): ?>
-                    <p style="color:#f97316;">@<?= htmlspecialchars($user['username']) ?></p>
+                    <p style="color:#f97316;">@<?= e($user['username']) ?></p>
+                <?php endif; ?>
+                <p><?= badge_dispo_gp($user['disponible']) ?></p>
+                <?php if (!empty($user['joignable_debut']) && !empty($user['joignable_fin'])): ?>
+                    <p class="horaires"><i class="fa-regular fa-clock"></i>
+                        Joignable de <?= e(heure_fr($user['joignable_debut'])) ?> à <?= e(heure_fr($user['joignable_fin'])) ?>
+                    </p>
                 <?php endif; ?>
                 <p class="profil-date">Membre depuis <?= date('d/m/Y', strtotime($user['created_at'])) ?></p>
             </div>
         </div>
 
+        <?php if ($contacts_gp): ?>
+            <div class="contacts-profil">
+                <?php afficher_boutons_whatsapp($contacts_gp); ?>
+            </div>
+        <?php endif; ?>
+
         <h3>Trajets</h3>
 
-        <?php if ($trajets->num_rows > 0): ?>
-            <?php while($row = $trajets->fetch_assoc()): ?>
+        <?php if ($trajets): ?>
+            <?php foreach ($trajets as $row): ?>
                 <div class="annonce">
-
-                    <div class="annonce-header">
-                        <span class="trajet-titre">
-                            <i class="fa-solid fa-plane-departure"></i> <?= htmlspecialchars($row['depart']) ?>
-                            →
-                            <i class="fa-solid fa-plane-arrival"></i> <?= htmlspecialchars($row['arrivee']) ?>
-                        </span>
-                        <div style="display:flex; gap:10px; align-items:center;">
-                            <?php
-                                // Couleur du badge selon le statut
-                                $couleurs = [
-                                    'disponible' => '#16a34a',
-                                    'en_route'   => '#f97316',
-                                    'arrivé'     => '#94a3b8'
-                                ];
-                                $couleur = $couleurs[$row['statut']] ?? '#94a3b8';
-                            ?>
-                            <span style="background-color:<?= $couleur ?>; padding:4px 12px; border-radius:20px; font-size:13px;">
-                                <?= htmlspecialchars($row['statut']) ?>
-                            </span>
-                            <span class="prix"><?= htmlspecialchars($row['prix_kilo']) ?> MAD/kg</span>
-                        </div>
-                    </div>
-
-                    <div class="annonce-body">
-
-                        <div class="info-ligne">
-                            <span> <i class="fa-solid fa-calendar"></i> Départ :</span>
-                            <span> <?= date('d/m/Y', strtotime($row['date_depart'])) ?></span>
-                        </div>
-
-                        <div class="info-ligne">
-                            <span> <i class="fa-solid fa-calendar"></i> Arrivée :</span>
-                            <span><?= date('d/m/Y', strtotime($row['date_arrivee'])) ?></span>
-                        </div>
-
-                        <?php if (!empty($row['point_depot'])): ?>
-                        <div class="info-ligne">
-                            <span> <i class="fa-solid fa-box"></i> Dépôt :</span>
-                            <span><?= htmlspecialchars($row['point_depot']) ?></span>
-                        </div>
-                        <?php endif; ?>
-
-                        <?php if (!empty($row['point_reception'])): ?>
-                        <div class="info-ligne">
-                            <span><i class="fa-solid fa-location-dot"></i> Réception :</span>
-                            <span><?= htmlspecialchars($row['point_reception']) ?></span>
-                        </div>
-                        <?php endif; ?>
-
-                        <?php if (!empty($row['commentaire'])): ?>
-                        <div class="info-ligne">
-                            <span> <i class="fa-solid fa-comment"></i> Commentaire :</span>
-                            <span><?= htmlspecialchars($row['commentaire']) ?></span>
-                        </div>
-                        <?php endif; ?>
-
-                    </div>
+                    <?php $avec_gp = false; include 'trajet_infos.php'; ?>
 
                     <div class="annonce-footer" style="display:flex; gap:10px; flex-wrap:wrap;">
                         <?php if (!empty($row['telephone'])): ?>
-                            <a href="tel:<?= htmlspecialchars($row['telephone']) ?>" class="btn-contact">
-                                <i class="fa-solid fa-phone"></i>
-                                <?= htmlspecialchars($row['telephone']) ?>
+                            <a href="tel:<?= e($row['telephone']) ?>" class="btn-contact">
+                                <i class="fa-solid fa-phone"></i> <?= e($row['telephone']) ?>
                             </a>
-                        <?php else: ?>
+                        <?php endif; ?>
+
+                        <?php afficher_boutons_whatsapp($contacts[$row['id']] ?? []); ?>
+
+                        <?php if (empty($row['telephone']) && empty($contacts[$row['id']])): ?>
                             <span class="no-contact"><i class="fa-solid fa-phone"></i> Contact non renseigné</span>
                         <?php endif; ?>
-
-                        <?php if (!empty($user['whatsapp'])): ?>
-                            <a href="https://wa.me/<?= preg_replace('/[^0-9]/', '', $user['whatsapp']) ?>" 
-                               target="_blank" class="btn-contact" style="background-color:#25d366;">
-                                <i class="fa-solid fa-comment"></i> WhatsApp
-                            </a>
-                        <?php endif; ?>
                     </div>
-
                 </div>
-            <?php endwhile; ?>
+            <?php endforeach; ?>
 
         <?php else: ?>
             <p>Ce GP n'a pas encore publié de trajet.</p>
