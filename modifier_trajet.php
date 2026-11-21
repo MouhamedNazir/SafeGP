@@ -1,6 +1,6 @@
 <?php
 include 'config.php';
-include 'navbar.php';
+include 'init.php';
 
 if (!isset($_SESSION['user_id'])) {
     header("Location: connexion.php");
@@ -75,6 +75,7 @@ $conn->close();
     <title>Modifier le trajet - SafeGP</title>
 </head>
 <body>
+<?php include 'navbar.php'; ?>
 
     <section class="publier">
         <h2>Modifier le trajet</h2>

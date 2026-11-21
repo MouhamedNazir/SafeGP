@@ -1,6 +1,6 @@
 <?php
 include 'config.php';
-include 'navbar.php';
+include 'init.php';
 
 $success = false;
 $erreur = "";
@@ -59,6 +59,7 @@ $conn->close();
     <title>Inscription - SafeGP</title>
 </head>
 <body>
+<?php include 'navbar.php'; ?>
 
     <section class="publier">
         <h2>Créer un compte</h2>

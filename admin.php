@@ -1,6 +1,6 @@
 <?php
 include 'config.php';
-include 'navbar.php';
+include 'init.php';
 
 // Vérification — seuls les admins peuvent accéder
 // Si pas connecté ou pas admin → redirection
@@ -102,6 +102,7 @@ $conn->close();
     <title>Admin - SafeGP</title>
 </head>
 <body>
+<?php include 'navbar.php'; ?>
 
 <section class="profil">
     <h2><i class="fa-solid fa-shield"></i> Panel Admin</h2>

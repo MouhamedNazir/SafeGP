@@ -1,6 +1,6 @@
 <?php
 include 'config.php';
-include 'navbar.php';
+include 'init.php';
 
 // On récupère les 6 derniers GPs qui ont des trajets disponibles
 $stmt = $conn->prepare("
@@ -26,6 +26,7 @@ $conn->close();
     <title>SafeGP</title>
 </head>
 <body>
+<?php include 'navbar.php'; ?>
 
     
 

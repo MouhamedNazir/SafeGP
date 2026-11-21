@@ -1,6 +1,6 @@
 <?php
 include 'config.php';
-include 'navbar.php';
+include 'init.php';
 
 // Seuls les connectés peuvent accéder au dashboard
 if (!isset($_SESSION['user_id'])) {
@@ -47,6 +47,7 @@ $conn->close();
     <title>Tableau de bord - SafeGP</title>
 </head>
 <body>
+<?php include 'navbar.php'; ?>
 
     <section class="profil">
         <h2>Mes trajets</h2>

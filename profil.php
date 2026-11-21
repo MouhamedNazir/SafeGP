@@ -1,6 +1,6 @@
 <?php
 include 'config.php';
-include 'navbar.php';
+include 'init.php';
 
 // On récupère l'id du GP dans l'URL
 $id = (int)($_GET['id'] ?? 0);
@@ -38,6 +38,7 @@ $stmt2->close();
     <title>Profil - <?= htmlspecialchars($user['nom']) ?></title>
 </head>
 <body>
+<?php include 'navbar.php'; ?>
 
     <section class="profil">
 

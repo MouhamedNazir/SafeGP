@@ -1,6 +1,6 @@
 <?php
 include 'config.php';
-include 'navbar.php';
+include 'init.php';
 
 $depart = trim($_GET['depart'] ?? '');
 $arrivee = trim($_GET['arrivee'] ?? '');
@@ -34,6 +34,7 @@ echo "</pre>";
     <title>Résultats - SafeGP</title>
 </head>
 <body>
+<?php include 'navbar.php'; ?>
 
     <section class="resultats">
         <h2>Trajets : <?= htmlspecialchars($depart) ?> → <?= htmlspecialchars($arrivee) ?></h2>

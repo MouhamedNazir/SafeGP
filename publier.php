@@ -1,6 +1,6 @@
 <?php
 include 'config.php';
-include 'navbar.php';
+include 'init.php';
 
 if (!isset($_SESSION['user_id'])) {
     header("Location: connexion.php");
@@ -60,6 +60,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <title>Publier un trajet - SafeGP</title>
 </head>
 <body>
+<?php include 'navbar.php'; ?>
 
     <section class="publier">
         <h2>Publier un trajet</h2>

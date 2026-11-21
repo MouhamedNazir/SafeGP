@@ -1,6 +1,6 @@
 <?php
 include 'config.php';
-include 'navbar.php';
+include 'init.php';
 
 // Seuls les connectés peuvent accéder à la messagerie
 if (!isset($_SESSION['user_id'])) {
@@ -101,6 +101,7 @@ $conn->close();
     <title>Messagerie - SafeGP</title>
 </head>
 <body>
+<?php include 'navbar.php'; ?>
 
 <section class="messagerie">
 

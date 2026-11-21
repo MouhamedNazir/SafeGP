@@ -1,6 +1,6 @@
 <?php
 include 'config.php';
-include 'navbar.php';
+include 'init.php';
 
 // Seuls les utilisateurs connectés peuvent accéder à cette page
 if (!isset($_SESSION['user_id'])) {
@@ -145,6 +145,7 @@ $conn->close();
     <title>Mon profil - SafeGP</title>
 </head>
 <body>
+<?php include 'navbar.php'; ?>
 
     <section class="profil">
         <h2>Mon profil</h2>
