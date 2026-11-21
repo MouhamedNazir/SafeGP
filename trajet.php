@@ -81,6 +81,56 @@ $texte_partage = "✈️ " . $titre_trajet . " le " . date('d/m/Y', strtotime($r
         </div>
     </div>
 
+    <!-- Réserver des kilos -->
+    <?php
+        $reservable = !$passe && $row['statut'] === 'disponible' && $row['disponible']
+            && (empty($row['date_limite_depot']) || $row['date_limite_depot'] >= date('Y-m-d'))
+            && ($row['kilos_total'] === null || (float)$row['kilos_restants'] > 0);
+        $erreur_resa = $_SESSION['erreur_reservation'] ?? null;
+        $saisie = $_SESSION['saisie_reservation'] ?? [];
+        unset($_SESSION['erreur_reservation'], $_SESSION['saisie_reservation']);
+    ?>
+    <?php if ($reservable && (int)$row['user_id'] !== $mon_id): ?>
+        <div class="bloc-reservation" id="reserver">
+            <h3><i class="fa-solid fa-box"></i> Réserver des kilos</h3>
+            <?php if ($erreur_resa): ?>
+                <p class="erreur"><i class="fa-solid fa-circle-xmark"></i> <?= e($erreur_resa) ?></p>
+            <?php endif; ?>
+            <?php if ($mon_id): ?>
+                <form action="reserver.php" method="POST" class="form-reservation">
+                    <?= csrf_field() ?>
+                    <input type="hidden" name="trajet_id" value="<?= $id ?>">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Poids (kg)</label>
+                            <input type="number" name="kilos" step="0.1" min="0.1" <?= $row['kilos_total'] !== null ? 'max="' . e($row['kilos_restants']) . '"' : '' ?>
+                                   value="<?= e($saisie['kilos'] ?? '') ?>" required data-prix-kilo="<?= e($row['prix_kilo']) ?>" data-devise="<?= e(DEVISES[$row['devise']][0] ?? '') ?>">
+                        </div>
+                        <div class="form-group">
+                            <label>Contenu du colis</label>
+                            <input type="text" name="contenu" maxlength="255" value="<?= e($saisie['contenu'] ?? '') ?>" placeholder="Ex : vêtements, 2 paires de chaussures" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Nom du destinataire</label>
+                            <input type="text" name="destinataire_nom" maxlength="100" value="<?= e($saisie['destinataire_nom'] ?? '') ?>" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Téléphone du destinataire <span class="facultatif">(facultatif)</span></label>
+                            <input type="tel" name="destinataire_tel" value="<?= e($saisie['destinataire_tel'] ?? '') ?>" placeholder="Ex : +221 77 123 45 67">
+                        </div>
+                    </div>
+                    <p class="estimation-prix" hidden>Prix estimé : <strong></strong></p>
+                    <button type="submit" class="btn-contact"><i class="fa-solid fa-paper-plane"></i> Envoyer la demande au GP</button>
+                    <small class="texte-doux-bloc">Le GP accepte ou refuse ta demande. Tu reçois un code de suivi à partager avec le destinataire.</small>
+                </form>
+            <?php else: ?>
+                <a href="connexion.php?suite=<?= e(urlencode('trajet.php?id=' . $id . '#reserver')) ?>" class="btn-contact">Se connecter pour réserver</a>
+            <?php endif; ?>
+        </div>
+    <?php endif; ?>
+
     <!-- Partager -->
     <div class="partage">
         <span><i class="fa-solid fa-share-nodes"></i> Partager cette annonce</span>

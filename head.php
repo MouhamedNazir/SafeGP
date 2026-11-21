@@ -48,6 +48,6 @@ $og_description = $og_description ?? 'Trouvez un GP (voyageur de confiance) pour
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flag-icons@7.2.3/css/flag-icons.min.css">
 
-<link rel="stylesheet" href="style.css?v=6">
+<link rel="stylesheet" href="style.css?v=7">
 <script>window.SAFEGP_T = <?= textes_js() ?>;</script>
 <script src="script.js" defer></script>

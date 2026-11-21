@@ -23,6 +23,14 @@ Plateforme web de mise en relation entre **GP** (voyageurs qui ont de la place d
 - **Alertes par e-mail** : « préviens-moi quand un trajet France → Sénégal est publié »
 - Les trajets terminés passent automatiquement au statut « arrivé »
 
+### Envois de colis
+- L'expéditeur **réserve des kilos** sur un trajet (poids, contenu, destinataire), avec le prix estimé
+- Le GP accepte ou refuse ; les kilos restants du trajet se mettent à jour tout seuls
+- Étapes : déposé → en route → arrivé → remis, avec **photo de preuve** au dépôt et à la remise
+- **Code de suivi** (`SGP7K3M9X`) : le destinataire suit le colis sans compte, sans voir ni contenu ni téléphones
+- **Reçu de dépôt** imprimable entre le GP et l'expéditeur
+- E-mail à chaque étape, page « Mes envois » pour les deux parties
+
 ### Confiance
 - **Avis et notes** des GP (1 à 5 étoiles), possibles seulement après un vrai échange de messages
 - **Badge « GP vérifié »** : pièce d'identité contrôlée par l'équipe, puis supprimée
@@ -40,10 +48,16 @@ Plateforme web de mise en relation entre **GP** (voyageurs qui ont de la place d
 - **Gratuit** : 4 trajets par mois. **Standard** : 8 trajets, 500 FCFA/mois ou 5 000 FCFA/an. **Illimité** : 750 FCFA/mois ou 7 500 FCFA/an (2 mois offerts en annuel)
 - Prix en FCFA avec équivalents en €, $ et DH
 - Paiement par **Wave**, **Orange Money** ou **virement bancaire** : le membre saisit la référence, l'admin vérifie et valide
+- **Capture du reçu de paiement** jointe à la demande (dossier privé, visible par l'admin seulement)
+- **Reçu** numéroté (`SGP-2026-0001`) imprimable pour chaque paiement
+- **Annulation sous 48 h** si aucun trajet n'a été publié : retour à la formule précédente, remboursement suivi dans l'admin
 - Rappel par e-mail 3 jours avant la fin, puis retour automatique à la formule Gratuite
 
 ### Comptes
 - Inscription avec **confirmation de l'adresse e-mail**, mot de passe oublié
+- **Mots de passe robustes** (lettre + chiffre, pas de mot de passe courant ni de nom) avec jauge de solidité
+- **E-mails vérifiés** : domaine qui reçoit vraiment des e-mails, adresses jetables refusées, fautes de frappe signalées (« gmial.com »)
+- Comptes jamais confirmés supprimés après 7 jours
 - Changement de mot de passe et d'e-mail, suppression de son compte
 - Photo de profil compressée automatiquement
 
@@ -117,7 +131,7 @@ Plateforme web de mise en relation entre **GP** (voyageurs qui ont de la place d
    git clone https://github.com/MouhamedNazir/SafeGP.git
    ```
 2. Créer une base MySQL `safegp` (utf8mb4) et y importer `schema.sql`.
-   - **Base déjà existante** : appliquer à la place les fichiers de `migrations/` dans l'ordre (001 à 005), une seule fois chacun.
+   - **Base déjà existante** : appliquer à la place les fichiers de `migrations/` dans l'ordre (001 à 006), une seule fois chacun.
 3. Copier `config.example.php` en `config.php` et renseigner les identifiants de la base.
 4. Lancer le projet sur un serveur local (XAMPP, WAMP…) et ouvrir `index.php`.
 5. Pour devenir administrateur après inscription :

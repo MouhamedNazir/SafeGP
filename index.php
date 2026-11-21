@@ -85,6 +85,8 @@ $conn->close();
             <button type="submit"><i class="fa-solid fa-magnifying-glass"></i> Rechercher</button>
         </form>
 
+        <p class="hero-suivi"><i class="fa-solid fa-magnifying-glass-location"></i> Vous avez un code de suivi ? <a href="suivi.php">Suivre un colis</a></p>
+
         <div class="hero-chiffres">
             <div><strong><?= (int)$stats['membres'] ?></strong><span>membres</span></div>
             <div><strong><?= (int)$stats['trajets'] ?></strong><span>trajets publiés</span></div>

@@ -17,3 +17,7 @@ logs/*
 # Pièces d'identité envoyées pour le badge « vérifié » (données privées)
 verifications/*
 !verifications/.htaccess
+
+# Preuves de paiement et photos des colis (données privées)
+preuves/*
+!preuves/.htaccess

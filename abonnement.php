@@ -49,9 +49,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && !$en_attente) {
         $erreur = "Indique la référence de la transaction (reçue par SMS ou dans l'application).";
     } elseif ($telephone !== null && !telephone_valide($telephone)) {
         $erreur = "Numéro de téléphone invalide.";
+    } elseif (!empty($_FILES['preuve']['name']) && !($preuve = enregistrer_fichier_prive($_FILES['preuve'], $erreur))) {
+        // $erreur est renseignée par enregistrer_fichier_prive()
     } else {
-        $stmt = $conn->prepare("INSERT INTO abonnements (user_id, formule, duree, montant, moyen, reference, telephone) VALUES (?, ?, ?, ?, ?, ?, ?)");
-        $stmt->bind_param("ississs", $user_id, $formule, $duree, $montant, $moyen, $reference, $telephone);
+        $preuve = $preuve ?? null;
+        $stmt = $conn->prepare("INSERT INTO abonnements (user_id, formule, duree, montant, moyen, reference, telephone, preuve) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt->bind_param("ississss", $user_id, $formule, $duree, $montant, $moyen, $reference, $telephone, $preuve);
         $stmt->execute();
         $stmt->close();
 
@@ -143,8 +146,8 @@ $conn->close();
                         <p><span><?= e($libelle) ?></span><strong><?= e($valeur) ?></strong>
                             <button type="button" class="btn-lien copier" data-copier="<?= e(preg_replace('/\s+/', '', $valeur)) ?>"><i class="fa-regular fa-copy"></i></button></p>
                     <?php endforeach; ?>
-                    <p class="aide-contact">Montant à virer : <strong><?= e(prix_fcfa($montant)) ?></strong> (<?= e(equivalents_prix($montant)) ?>).
-                        Indique ton nom d'utilisateur SafeGP dans le motif du virement. Les frais bancaires sont à ta charge.</p>
+                    <p class="aide-contact">Montant à virer : <strong><?= e(prix_fcfa($montant)) ?></strong> <small>(<?= e(equivalents_prix($montant)) ?>)</small><br>
+                        <span>Indique ton nom d'utilisateur SafeGP dans le motif du virement. Les frais bancaires sont à ta charge.</span></p>
                 </div>
             </details>
         <?php endif; ?>
@@ -158,7 +161,7 @@ $conn->close();
         <?php if ($erreur): ?>
             <p class="erreur"><i class="fa-solid fa-circle-xmark"></i> <?= e($erreur) ?></p>
         <?php endif; ?>
-        <form action="abonnement.php" method="POST">
+        <form action="abonnement.php" method="POST" enctype="multipart/form-data">
             <?= csrf_field() ?>
             <input type="hidden" name="formule" value="<?= e($formule) ?>">
             <input type="hidden" name="duree" value="<?= e($duree) ?>">
@@ -178,6 +181,11 @@ $conn->close();
             <div class="form-group">
                 <label>Numéro qui a payé <span class="facultatif">(facultatif, aide à retrouver le paiement)</span></label>
                 <input type="tel" name="telephone" value="<?= e($_POST['telephone'] ?? '') ?>" placeholder="Ex : +221 77 123 45 67">
+            </div>
+            <div class="form-group">
+                <label>Capture du reçu de paiement <span class="facultatif">(conseillé : ta demande est validée plus vite)</span></label>
+                <input type="file" name="preuve" accept=".jpg,.jpeg,.png,.webp">
+                <small>Capture d'écran du SMS ou de l'application Wave / Orange Money. Visible uniquement par l'équipe SafeGP.</small>
             </div>
             <button type="submit" class="btn-publier"><i class="fa-solid fa-paper-plane"></i> Envoyer ma demande</button>
             <p class="aide-contact" style="text-align:center; margin-top:15px;">En t'abonnant, tu acceptes les <a href="conditions.php">conditions d'utilisation</a>.</p>

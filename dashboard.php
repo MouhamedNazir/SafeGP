@@ -69,6 +69,9 @@ $conn->close();
             + Publier un nouveau trajet
         </a>
         <?php include 'quota_bandeau.php'; ?>
+        <?php if (!empty($nav_envois_a_traiter)): ?>
+            <div class="bandeau-info"><i class="fa-solid fa-box"></i> <?= (int)$nav_envois_a_traiter ?> réservation(s) de colis attendent ta réponse. <a href="envois.php">Voir mes envois</a></div>
+        <?php endif; ?>
 
         <?php if ($trajets): ?>
 

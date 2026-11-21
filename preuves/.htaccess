@@ -1,0 +1,8 @@
+# Preuves de paiement et photos des colis : jamais accessibles depuis le web (fichier_prive.php vérifie les droits)
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+<IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+</IfModule>

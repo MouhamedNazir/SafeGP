@@ -13,6 +13,7 @@
                 <li><a href="search_trajet.php">Rechercher un trajet</a></li>
                 <li><a href="publier.php">Publier un trajet</a></li>
                 <li><a href="tarifs.php">Tarifs</a></li>
+                <li><a href="suivi.php">Suivre un colis</a></li>
                 <li><a href="membres.php">Rechercher un membre</a></li>
                 <li><a href="retours.php">Donner mon avis</a></li>
                 <li><a href="inscription.php">S'inscrire</a></li>

@@ -2623,6 +2623,519 @@ small.texte-doux-bloc {
 }
 
 /* ============================================================
+   MOT DE PASSE, E-MAIL
+   ============================================================ */
+.jauge-mdp {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 18px;
+}
+.jauge-mdp span {
+    flex: 1;
+    height: 6px;
+    border-radius: 999px;
+    background: var(--surface-2);
+    position: relative;
+    overflow: hidden;
+}
+.jauge-mdp span::after {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 0;
+    border-radius: 999px;
+    transition: width 0.25s, background-color 0.25s;
+}
+.jauge-mdp[data-niveau="0"] span::after { width: 25%; background: var(--rouge-texte); }
+.jauge-mdp[data-niveau="1"] span::after { width: 50%; background: #f59e0b; }
+.jauge-mdp[data-niveau="2"] span::after { width: 75%; background: #84cc16; }
+.jauge-mdp[data-niveau="3"] span::after { width: 100%; background: var(--vert); }
+.jauge-mdp small {
+    min-width: 70px;
+    font-size: 12px;
+    color: var(--texte-doux);
+}
+.suggestion-email {
+    background: var(--orange-voile);
+    border-left: 3px solid var(--orange);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 14px;
+}
+.suggestion-email .btn-lien {
+    color: var(--orange-texte);
+    text-decoration: underline;
+}
+.suggestion-email small {
+    display: block;
+    color: var(--texte-doux);
+}
+
+/* ============================================================
+   ENVOIS DE COLIS
+   ============================================================ */
+.badge-envoi {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+    background: var(--surface-2);
+    color: var(--texte);
+}
+.badge-envoi.statut-demande { background: rgba(245, 158, 11, 0.15); color: #b45309; }
+.badge-envoi.statut-accepte,
+.badge-envoi.statut-depose,
+.badge-envoi.statut-en_route { background: rgba(59, 130, 246, 0.14); color: var(--bleu-texte); }
+.badge-envoi.statut-arrive,
+.badge-envoi.statut-remis { background: rgba(22, 163, 74, 0.14); color: var(--vert-texte); }
+.badge-envoi.statut-refuse,
+.badge-envoi.statut-annule { background: rgba(185, 28, 28, 0.12); color: var(--rouge-texte); }
+:root:not([data-theme="clair"]) .badge-envoi.statut-demande { color: #fbbf24; }
+
+.bloc-reservation {
+    background: var(--surface);
+    border: 2px solid var(--orange);
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 10px 30px rgba(249, 115, 22, 0.12);
+    scroll-margin-top: 100px;
+}
+.bloc-reservation h3 {
+    margin-top: 0;
+}
+.bloc-reservation h3 i {
+    color: var(--orange);
+}
+.form-reservation small {
+    display: block;
+    margin-top: 10px;
+}
+.estimation-prix {
+    font-size: 16px;
+}
+.estimation-prix strong {
+    color: var(--orange-texte);
+}
+
+.envoi-entete {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    flex-wrap: wrap;
+    background: var(--surface);
+    border: 1px solid var(--bordure);
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+.envoi-code-label {
+    font-size: 12px;
+    color: var(--texte-doux);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+.envoi-code {
+    margin: 2px 0 8px;
+    font-size: 28px;
+    letter-spacing: 0.08em;
+    font-family: 'Poppins', monospace;
+}
+
+/* Frise de suivi */
+.frise {
+    list-style: none;
+    display: flex;
+    padding: 0;
+    margin: 0 0 24px;
+    counter-reset: etape;
+}
+.frise li {
+    flex: 1;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 6px;
+    color: var(--texte-doux);
+    font-size: 13px;
+}
+.frise li::before {
+    content: "";
+    position: absolute;
+    top: 18px;
+    left: -50%;
+    width: 100%;
+    height: 3px;
+    background: var(--bordure);
+    z-index: 0;
+}
+.frise li:first-child::before {
+    display: none;
+}
+.frise li.fait::before {
+    background: var(--orange);
+}
+.frise-point {
+    position: relative;
+    z-index: 1;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--surface-2);
+    border: 2px solid var(--bordure);
+    color: var(--texte-doux);
+}
+.frise li.fait .frise-point {
+    background: var(--orange);
+    border-color: var(--orange);
+    color: #fff;
+}
+.frise li.actuel .frise-point {
+    box-shadow: 0 0 0 5px var(--orange-voile);
+}
+.frise li.fait .frise-texte {
+    color: var(--texte);
+    font-weight: 600;
+}
+.frise small {
+    font-size: 11px;
+}
+/* Version verticale (page de suivi public) */
+.frise-verticale {
+    flex-direction: column;
+    gap: 0;
+}
+.frise-verticale li {
+    flex-direction: row;
+    text-align: left;
+    gap: 14px;
+    padding: 8px 0;
+}
+.frise-verticale li::before {
+    top: -50%;
+    left: 18px;
+    width: 3px;
+    height: 100%;
+}
+.frise-verticale small {
+    margin-left: auto;
+}
+
+.envoi-grille {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 20px;
+    align-items: start;
+}
+.envoi-details {
+    margin-bottom: 0;
+}
+.envoi-details .info-ligne span:first-child {
+    min-width: 170px;
+}
+.envoi-details a {
+    color: var(--orange-texte);
+}
+.envoi-cote {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+.bloc-actions-envoi {
+    background: var(--surface);
+    border: 1px solid var(--bordure);
+    border-radius: 16px;
+    padding: 18px;
+}
+.bloc-actions-envoi h3 {
+    margin: 0 0 12px;
+    font-size: 16px;
+}
+.form-action-envoi {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px 0;
+    border-bottom: 1px dashed var(--bordure);
+}
+.form-action-envoi:last-child {
+    border-bottom: none;
+}
+.form-action-envoi .btn-contact {
+    justify-content: center;
+}
+.form-action-envoi input[type="file"] {
+    color: var(--texte);
+    font-size: 13px;
+}
+.petit-label {
+    font-size: 13px;
+    font-weight: 600;
+}
+.historique-envoi {
+    list-style: none;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.historique-envoi li {
+    background: var(--surface);
+    border: 1px solid var(--bordure);
+    border-radius: 12px;
+    padding: 12px 16px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+}
+.historique-envoi p {
+    flex-basis: 100%;
+    margin: 0;
+}
+.preuve-photo img {
+    max-width: 220px;
+    max-height: 160px;
+    border-radius: 10px;
+    border: 1px solid var(--bordure);
+    object-fit: cover;
+}
+
+.liste-envois {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.carte-envoi {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 16px 18px;
+    background: var(--surface);
+    border: 1px solid var(--bordure);
+    border-radius: 14px;
+    color: var(--texte);
+    text-decoration: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+.carte-envoi:hover {
+    border-color: var(--orange);
+    box-shadow: var(--ombre-legere);
+}
+.carte-envoi.a-traiter {
+    border-left: 4px solid #f59e0b;
+}
+.carte-envoi-haut {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+.carte-envoi .carte-trajet-route {
+    justify-content: flex-start;
+    gap: 14px;
+}
+
+/* Suivi public */
+.form-suivi {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 24px;
+}
+.form-suivi input {
+    flex: 1;
+    padding: 13px 14px;
+    border-radius: 10px;
+    border: 1px solid var(--bordure);
+    background: var(--surface);
+    color: var(--texte);
+    font-family: inherit;
+    font-size: 16px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+.resultat-suivi .frise {
+    background: var(--surface);
+    border: 1px solid var(--bordure);
+    border-radius: 16px;
+    padding: 10px 20px;
+}
+.hero-suivi {
+    margin: 18px 0 0;
+    font-size: 14px;
+    color: var(--texte-doux);
+}
+.hero-suivi i {
+    color: var(--orange);
+}
+
+/* Abonnements : actions de l'historique */
+.actions-abonnement {
+    white-space: nowrap;
+}
+.actions-abonnement .btn-lien {
+    color: var(--orange-texte);
+}
+.lien-annuler small {
+    display: block;
+    color: var(--texte-doux);
+}
+.lien-preuve {
+    font-size: 13px;
+}
+
+/* ============================================================
+   REÇUS (abonnement et dépôt de colis)
+   ============================================================ */
+.recu {
+    max-width: 860px;
+    margin: 40px auto;
+    padding: 0 20px;
+}
+.recu-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+}
+.recu-feuille {
+    background: #fff;
+    color: #0f172a;
+    border-radius: 12px;
+    padding: 40px;
+    box-shadow: var(--ombre);
+}
+.recu-entete {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 20px;
+    flex-wrap: wrap;
+    padding-bottom: 20px;
+    border-bottom: 2px solid #f97316;
+}
+.recu-entete h2 {
+    margin: 4px 0 0;
+    color: #0f172a;
+}
+.recu-logo {
+    height: 56px;
+}
+.recu-titre {
+    text-align: right;
+}
+.recu-titre h3 {
+    margin: 0 0 6px;
+    color: #c2410c;
+}
+.recu-titre p {
+    margin: 2px 0;
+}
+.recu-annule {
+    margin: 16px 0 0;
+    padding: 10px;
+    text-align: center;
+    font-weight: 700;
+    color: #b91c1c;
+    border: 2px dashed #b91c1c;
+    border-radius: 8px;
+}
+.recu-colonnes {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+}
+.recu-bloc h4 {
+    margin: 22px 0 6px;
+    color: #64748b;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+.recu-bloc p {
+    margin: 0;
+}
+.recu-tableau {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 24px;
+}
+.recu-tableau th,
+.recu-tableau td {
+    padding: 10px;
+    border-bottom: 1px solid #e2e8f0;
+    text-align: left;
+    vertical-align: top;
+}
+.recu-tableau th {
+    background: #f8fafc;
+    font-size: 13px;
+    color: #475569;
+}
+.recu-tableau tfoot td {
+    border-bottom: none;
+    font-size: 17px;
+}
+.recu-tableau code {
+    background: #f1f5f9;
+}
+.recu-signatures {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 30px;
+    margin-top: 40px;
+}
+.recu-signatures div {
+    border-top: 1px solid #94a3b8;
+    padding-top: 6px;
+    font-size: 13px;
+    color: #64748b;
+    min-height: 60px;
+}
+.recu-pied {
+    margin-top: 30px;
+    font-size: 12px;
+    color: #64748b;
+}
+
+/* Impression : seul le reçu est imprimé */
+@media print {
+    nav,
+    footer,
+    .bandeau-info,
+    .recu-actions {
+        display: none !important;
+    }
+    body {
+        background: #fff !important;
+        padding: 0 !important;
+    }
+    .recu {
+        margin: 0;
+        padding: 0;
+        max-width: none;
+    }
+    .recu-feuille {
+        box-shadow: none;
+        padding: 0;
+    }
+}
+
+/* ============================================================
    RESPONSIVE (tablettes et téléphones)
    ============================================================ */
 /* Menu ☰ : dès que les liens ne tiennent plus sur une ligne */
@@ -2693,6 +3206,9 @@ small.texte-doux-bloc {
 }
 
 @media (max-width: 960px) {
+    .envoi-grille {
+        grid-template-columns: 1fr;
+    }
 
     .hero-recherche {
         flex-direction: column;
@@ -2737,6 +3253,24 @@ small.texte-doux-bloc {
 }
 
 @media (max-width: 600px) {
+    .frise li .frise-texte {
+        font-size: 11px;
+    }
+    .frise:not(.frise-verticale) small {
+        display: none;
+    }
+    .envoi-details .info-ligne span:first-child {
+        min-width: 0;
+    }
+    .recu-feuille {
+        padding: 22px;
+    }
+    .recu-titre {
+        text-align: left;
+    }
+    .form-suivi {
+        flex-direction: column;
+    }
     .hero {
         padding: 40px 16px 34px;
     }

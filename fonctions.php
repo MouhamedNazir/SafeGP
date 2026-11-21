@@ -388,9 +388,13 @@ function abonnement_valider(mysqli $conn, int $demande_id): ?array
     $debut = $prolonge ? date('Y-m-d', strtotime($d['abonnement_fin'] . ' +1 day')) : $aujourdhui;
     $fin = date('Y-m-d', strtotime($debut . ($d['duree'] === 'an' ? ' +1 year' : ' +1 month') . ' -1 day'));
 
+    // On garde la formule d'avant : elle sera remise si l'abonnement est annulé sous 48 h
+    $formule_avant = formule_active(['formule' => $d['formule_actuelle'], 'abonnement_fin' => $d['abonnement_fin']]);
+    $fin_avant = $formule_avant === 'gratuit' ? null : $d['abonnement_fin'];
+
     $conn->begin_transaction();
-    $stmt = $conn->prepare("UPDATE abonnements SET statut = 'valide', date_debut = ?, date_fin = ?, traite_le = NOW() WHERE id = ?");
-    $stmt->bind_param("ssi", $debut, $fin, $demande_id);
+    $stmt = $conn->prepare("UPDATE abonnements SET statut = 'valide', date_debut = ?, date_fin = ?, traite_le = NOW(), formule_avant = ?, fin_avant = ? WHERE id = ?");
+    $stmt->bind_param("ssssi", $debut, $fin, $formule_avant, $fin_avant, $demande_id);
     $stmt->execute();
     $stmt->close();
     $stmt = $conn->prepare("UPDATE users SET formule = ?, abonnement_fin = ?, rappel_abonnement = NULL WHERE id = ?");
@@ -403,7 +407,8 @@ function abonnement_valider(mysqli $conn, int $demande_id): ?array
         'Abonnement activé',
         '<p>Bonjour ' . htmlspecialchars($d['nom']) . ',</p><p>Ton paiement a été vérifié : ta formule <strong>'
         . htmlspecialchars(FORMULES[$d['formule']]['nom']) . '</strong> est active jusqu\'au <strong>'
-        . date('d/m/Y', strtotime($fin)) . '</strong>. Merci pour ta confiance !</p>',
+        . date('d/m/Y', strtotime($fin)) . '</strong>. Merci pour ta confiance !</p>'
+        . '<p>Ton reçu est disponible dans « Mon profil ». Tu peux annuler sous 48 heures si tu ne publies aucun trajet d’ici là.</p>',
         'Publier un trajet',
         url_site() . '/publier.php'
     ));
@@ -474,6 +479,19 @@ function supprimer_utilisateur(mysqli $conn, int $id): bool
     $stmt->close();
     if (!$u) return false;
 
+    // Fichiers privés liés au compte (preuves de paiement, photos des colis,
+    // pièce d'identité en attente) : supprimés avec lui
+    $fichiers = [];
+    foreach ([
+        "SELECT preuve FROM abonnements WHERE user_id = $id AND preuve IS NOT NULL",
+        "SELECT et.photo FROM envois_etapes et JOIN envois e ON e.id = et.envoi_id WHERE (e.gp_id = $id OR e.expediteur_id = $id) AND et.photo IS NOT NULL",
+    ] as $sql) {
+        $res = $conn->query($sql);
+        while ($f = $res->fetch_row()) $fichiers[] = __DIR__ . '/preuves/' . $f[0];
+    }
+    $res = $conn->query("SELECT fichier FROM verifications WHERE user_id = $id AND fichier IS NOT NULL");
+    while ($f = $res->fetch_row()) $fichiers[] = __DIR__ . '/verifications/' . $f[0];
+
     $conn->begin_transaction();
     try {
         foreach ([
@@ -491,6 +509,10 @@ function supprimer_utilisateur(mysqli $conn, int $id): bool
         $conn->rollback();
         error_log('[SafeGP] Suppression du compte ' . $id . ' impossible : ' . $ex->getMessage());
         return false;
+    }
+
+    foreach ($fichiers as $f) {
+        if (preg_match('/^[a-f0-9]{32}\.(img|jpg)$/', basename($f))) @unlink($f);
     }
 
     // Photo de profil (nom de fichier contrôlé : user_<id>.<ext>)
@@ -855,4 +877,398 @@ function pagination(int $total, int $page, string $param, string $ancre = ''): s
     }
     if ($page < $nb_pages) $html .= '<a href="' . $lien($page + 1) . '" aria-label="Page suivante">›</a>';
     return $html . '</nav>';
+}
+
+// ============================================================
+// MOTS DE PASSE ROBUSTES
+// Au moins 8 caractères, une lettre et un chiffre, pas un mot de
+// passe courant, et pas le nom / l'e-mail / le nom d'utilisateur.
+// ============================================================
+const MOTS_DE_PASSE_COURANTS = [
+    '12345678', '123456789', '1234567890', '87654321', '11111111', '00000000', '12341234', '11223344',
+    'password', 'password1', 'password123', 'passw0rd', 'motdepasse', 'motdepasse1', 'motdepasse123',
+    'azerty', 'azerty12', 'azerty123', 'azertyuiop', 'qwerty12', 'qwerty123', 'qwertyuiop', 'abc12345',
+    'abcd1234', 'aaaaaaaa', 'iloveyou', 'iloveyou1', 'bonjour1', 'bonjour123', 'soleil123', 'marseille',
+    'senegal1', 'senegal123', 'maroc123', 'dakar123', 'casablanca', 'safegp123', 'admin123', 'welcome1',
+    'football', 'football1', 'sunshine1', 'princess1', 'dragon123', 'monkey123', 'letmein1', 'test1234',
+];
+
+function mot_de_passe_probleme(string $mdp, array $infos_perso = []): string
+{
+    if (strlen($mdp) < 8) {
+        return "Le mot de passe doit faire au moins 8 caractères.";
+    }
+    if (!preg_match('/\p{L}/u', $mdp) || !preg_match('/\d/', $mdp)) {
+        return "Le mot de passe doit contenir au moins une lettre et un chiffre.";
+    }
+    if (in_array(mb_strtolower($mdp), MOTS_DE_PASSE_COURANTS, true) || preg_match('/^(.)\1+$/', $mdp)) {
+        return "Ce mot de passe est trop courant, choisis-en un autre.";
+    }
+    // Mots du nom, du nom d'utilisateur et de l'e-mail (avant le @)
+    $mots = [];
+    foreach ($infos_perso as $info) {
+        $info = mb_strtolower(explode('@', (string)$info)[0]);
+        $mots = array_merge($mots, preg_split('/[\s._\-]+/u', $info));
+    }
+    foreach ($mots as $mot) {
+        if (mb_strlen($mot) >= 4 && str_contains(mb_strtolower($mdp), $mot)) {
+            return "Le mot de passe ne doit pas contenir ton nom ou ton adresse e-mail.";
+        }
+    }
+    return "";
+}
+
+// ============================================================
+// ADRESSES E-MAIL : format, domaine qui reçoit vraiment des
+// e-mails, adresses jetables refusées, fautes de frappe repérées
+// ============================================================
+const DOMAINES_JETABLES = [
+    'yopmail.com', 'yopmail.fr', 'yopmail.net', 'mailinator.com', 'guerrillamail.com', 'guerrillamail.net',
+    '10minutemail.com', '10minutemail.net', 'tempmail.com', 'temp-mail.org', 'trashmail.com', 'trashmail.fr',
+    'getnada.com', 'dispostable.com', 'maildrop.cc', 'sharklasers.com', 'throwawaymail.com', 'fakeinbox.com',
+    'jetable.org', 'mailnesia.com', 'mintemail.com', 'emailondeck.com', 'mohmal.com', 'tempmailo.com',
+    'moakt.com', 'spamgourmet.com', 'mytemp.email', 'tempr.email', 'discard.email', 'burnermail.io',
+];
+const DOMAINES_COURANTS = [
+    'gmail.com', 'yahoo.fr', 'yahoo.com', 'hotmail.com', 'hotmail.fr', 'outlook.com', 'outlook.fr',
+    'live.fr', 'live.com', 'icloud.com', 'orange.fr', 'orange.sn', 'menara.ma', 'aol.com', 'protonmail.com',
+];
+
+function email_probleme(string $email): string
+{
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        return "Adresse e-mail invalide.";
+    }
+    $domaine = strtolower(substr(strrchr($email, '@'), 1));
+    if (in_array($domaine, DOMAINES_JETABLES, true)) {
+        return "Les adresses e-mail jetables ne sont pas acceptées.";
+    }
+    if (in_array($domaine, DOMAINES_COURANTS, true) || preg_match('/\.test$/', $domaine)) {
+        return ""; // domaines connus (et domaines de test) : pas besoin d'interroger le DNS
+    }
+    // Le domaine doit pouvoir recevoir des e-mails (serveur MX, ou à défaut une adresse)
+    if (function_exists('checkdnsrr') && !checkdnsrr($domaine . '.', 'MX') && !checkdnsrr($domaine . '.', 'A')) {
+        return "Ce domaine d'e-mail n'existe pas : vérifie ton adresse.";
+    }
+    return "";
+}
+
+// « tonnom@gmial.com » → « tonnom@gmail.com » (null si rien à suggérer)
+function email_suggestion(string $email): ?string
+{
+    if (!str_contains($email, '@')) return null;
+    [$local, $domaine] = explode('@', strtolower($email), 2);
+    if (in_array($domaine, DOMAINES_COURANTS, true)) return null;
+    foreach (DOMAINES_COURANTS as $connu) {
+        if (levenshtein($domaine, $connu) <= 2) return $local . '@' . $connu;
+    }
+    return null;
+}
+
+// ============================================================
+// TÂCHES QUOTIDIENNES (lancées par la première visite de la journée,
+// l'hébergeur gratuit n'ayant pas de tâches planifiées)
+// ============================================================
+function taches_quotidiennes(mysqli $conn): void
+{
+    // 1. Trajets dont la date d'arrivée est passée → « arrivé »
+    $conn->query("UPDATE trajets SET statut = 'arrivé' WHERE date_arrivee < CURDATE() AND statut <> 'arrivé'");
+
+    // 2. Comptes jamais confirmés depuis 7 jours → supprimés
+    //    (seulement quand les e-mails partent vraiment, sinon personne ne pourrait confirmer)
+    if (function_exists('smtp_configure') && smtp_configure()) {
+        $res = $conn->query("SELECT id FROM users WHERE email_verifie = 0 AND role = 'user' AND created_at < NOW() - INTERVAL 7 DAY");
+        while ($u = $res->fetch_row()) supprimer_utilisateur($conn, (int)$u[0]);
+    }
+
+    // 3. Preuves de paiement de plus de 12 mois → fichier supprimé (la ligne reste pour l'historique)
+    $res = $conn->query("SELECT id, preuve FROM abonnements WHERE preuve IS NOT NULL AND created_at < NOW() - INTERVAL 12 MONTH");
+    while ($a = $res->fetch_assoc()) {
+        if (preg_match('/^[a-f0-9]{32}\.(jpg|img)$/', $a['preuve'])) @unlink(__DIR__ . '/preuves/' . $a['preuve']);
+        $conn->query("UPDATE abonnements SET preuve = NULL WHERE id = " . (int)$a['id']);
+    }
+}
+
+// ============================================================
+// FICHIERS PRIVÉS (preuves de paiement, photos des colis)
+// Enregistrés dans preuves/ (fermé au web) sous un nom aléatoire,
+// affichés seulement via fichier_prive.php qui vérifie les droits.
+// ============================================================
+function enregistrer_fichier_prive(array $fichier, string &$erreur): ?string
+{
+    $erreur = image_envoyee_valide($fichier, 8 * 1024 * 1024);
+    if ($erreur) return null;
+    $chemin = __DIR__ . '/preuves/' . bin2hex(random_bytes(16)) . '.img';
+    if (!move_uploaded_file($fichier['tmp_name'], $chemin)) {
+        $erreur = "L'envoi a échoué, réessaie.";
+        return null;
+    }
+    return basename(compresser_image($chemin, 1600, 85));
+}
+
+// ============================================================
+// ANNULATION D'ABONNEMENT : possible pendant 48 h après l'activation,
+// si aucun trajet n'a été publié depuis (le service n'a pas servi)
+// ============================================================
+const ANNULATION_HEURES = 48;
+
+function numero_recu(array $abonnement): string
+{
+    $annee = date('Y', strtotime($abonnement['traite_le'] ?? $abonnement['created_at']));
+    return 'SGP-' . $annee . '-' . str_pad((string)$abonnement['id'], 4, '0', STR_PAD_LEFT);
+}
+
+// Renvoie "" si l'abonnement peut être annulé, sinon la raison
+function abonnement_annulation_impossible(mysqli $conn, array $a): string
+{
+    if ($a['statut'] !== 'valide' || empty($a['traite_le'])) {
+        return "Seul un abonnement validé peut être annulé.";
+    }
+    if (strtotime($a['traite_le']) < time() - ANNULATION_HEURES * 3600) {
+        return "Le délai d'annulation de 48 heures est dépassé.";
+    }
+    $stmt = $conn->prepare("SELECT COUNT(*) FROM trajets WHERE user_id = ? AND created_at >= ?");
+    $stmt->bind_param("is", $a['user_id'], $a['traite_le']);
+    $stmt->execute();
+    $publies = (int)$stmt->get_result()->fetch_row()[0];
+    $stmt->close();
+    if ($publies > 0) {
+        return "Tu as déjà publié un trajet avec cette formule : elle ne peut plus être annulée.";
+    }
+    // Seul le dernier abonnement validé peut être annulé
+    $stmt = $conn->prepare("SELECT COUNT(*) FROM abonnements WHERE user_id = ? AND statut = 'valide' AND id > ?");
+    $stmt->bind_param("ii", $a['user_id'], $a['id']);
+    $stmt->execute();
+    $plus_recent = (int)$stmt->get_result()->fetch_row()[0];
+    $stmt->close();
+    return $plus_recent ? "Un abonnement plus récent existe déjà." : "";
+}
+
+// Annule : on remet la formule d'avant et on prévient l'admin (remboursement à faire)
+function abonnement_annuler(mysqli $conn, int $abonnement_id, int $user_id): string
+{
+    $stmt = $conn->prepare("SELECT a.*, u.nom, u.email FROM abonnements a JOIN users u ON u.id = a.user_id WHERE a.id = ? AND a.user_id = ?");
+    $stmt->bind_param("ii", $abonnement_id, $user_id);
+    $stmt->execute();
+    $a = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    if (!$a) return "Abonnement introuvable.";
+    if ($raison = abonnement_annulation_impossible($conn, $a)) return $raison;
+
+    $formule_avant = $a['formule_avant'] ?: 'gratuit';
+    $fin_avant = $formule_avant === 'gratuit' ? null : $a['fin_avant'];
+    $conn->begin_transaction();
+    $stmt = $conn->prepare("UPDATE abonnements SET statut = 'annule', annule_le = NOW() WHERE id = ?");
+    $stmt->bind_param("i", $abonnement_id);
+    $stmt->execute();
+    $stmt->close();
+    $stmt = $conn->prepare("UPDATE users SET formule = ?, abonnement_fin = ?, rappel_abonnement = NULL WHERE id = ?");
+    $stmt->bind_param("ssi", $formule_avant, $fin_avant, $user_id);
+    $stmt->execute();
+    $stmt->close();
+    $conn->commit();
+
+    $admins = $conn->query("SELECT email FROM users WHERE role = 'admin'");
+    while ($admin = $admins->fetch_assoc()) {
+        email_envoyer($admin['email'], 'Remboursement à faire : ' . prix_fcfa((int)$a['montant']), email_gabarit(
+            'Abonnement annulé',
+            '<p><strong>' . htmlspecialchars($a['nom']) . '</strong> a annulé son abonnement '
+            . htmlspecialchars(FORMULES[$a['formule']]['nom']) . ' (reçu ' . numero_recu($a) . ').</p>'
+            . '<p>À rembourser : <strong>' . prix_fcfa((int)$a['montant']) . '</strong> par '
+            . htmlspecialchars(MOYENS_PAIEMENT[$a['moyen']]) . ($a['telephone'] ? ' au ' . htmlspecialchars($a['telephone']) : '') . '.</p>',
+            'Voir dans le panel admin',
+            url_site() . '/admin.php#abonnements'
+        ));
+    }
+    email_envoyer($a['email'], 'Annulation de ton abonnement - SafeGP', email_gabarit(
+        'Abonnement annulé',
+        '<p>Bonjour ' . htmlspecialchars($a['nom']) . ',</p><p>Ton abonnement a bien été annulé. Tu seras remboursé de <strong>'
+        . prix_fcfa((int)$a['montant']) . '</strong> sous quelques jours, par le moyen utilisé pour payer.</p>',
+        'Mon abonnement',
+        url_site() . '/mon_profil.php#abonnement'
+    ));
+    return "";
+}
+
+// ============================================================
+// ENVOIS DE COLIS (réservation de kilos + suivi)
+// demande → accepte → depose → en_route → arrive → remis
+// (ou refuse / annule avant le dépôt)
+// ============================================================
+const STATUTS_ENVOI = [
+    'demande'  => ['En attente du GP', 'fa-hourglass-half'],
+    'accepte'  => ['Accepté par le GP', 'fa-handshake'],
+    'refuse'   => ['Refusé par le GP', 'fa-circle-xmark'],
+    'annule'   => ['Annulé', 'fa-ban'],
+    'depose'   => ['Colis déposé', 'fa-box'],
+    'en_route' => ['En route', 'fa-plane'],
+    'arrive'   => ['Arrivé à destination', 'fa-location-dot'],
+    'remis'    => ['Remis au destinataire', 'fa-circle-check'],
+];
+// Étapes normales, dans l'ordre (pour la frise de suivi)
+const ETAPES_ENVOI = ['demande', 'accepte', 'depose', 'en_route', 'arrive', 'remis'];
+
+// Qui peut faire passer un envoi à quel statut
+const TRANSITIONS_GP = [
+    'demande'  => ['accepte', 'refuse'],
+    'accepte'  => ['depose', 'annule'],
+    'depose'   => ['en_route'],
+    'en_route' => ['arrive'],
+    'arrive'   => ['remis'],
+];
+const TRANSITIONS_EXPEDITEUR = [
+    'demande' => ['annule'],
+    'accepte' => ['annule'],
+];
+
+// Libellés des boutons d'action
+const ACTIONS_ENVOI = [
+    'accepte'  => 'Accepter',
+    'refuse'   => 'Refuser',
+    'annule'   => 'Annuler l\'envoi',
+    'depose'   => 'Colis reçu (déposé)',
+    'en_route' => 'Parti : en route',
+    'arrive'   => 'Arrivé à destination',
+    'remis'    => 'Remis au destinataire',
+];
+
+function libelle_statut_envoi(string $statut): string
+{
+    return STATUTS_ENVOI[$statut][0] ?? $statut;
+}
+
+// Code de suivi lisible : SGP + 6 caractères sans ambiguïté (pas de 0/O, 1/I/L)
+function envoi_nouveau_code(mysqli $conn): string
+{
+    $alphabet = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+    do {
+        $code = 'SGP';
+        for ($i = 0; $i < 6; $i++) $code .= $alphabet[random_int(0, strlen($alphabet) - 1)];
+        $stmt = $conn->prepare("SELECT 1 FROM envois WHERE code = ?");
+        $stmt->bind_param("s", $code);
+        $stmt->execute();
+        $existe = (bool)$stmt->get_result()->fetch_row();
+        $stmt->close();
+    } while ($existe);
+    return $code;
+}
+
+// Réserver des kilos sur un trajet. Renvoie le code de suivi, ou un texte d'erreur (préfixé "!")
+function envoi_reserver(mysqli $conn, int $expediteur_id, int $trajet_id, array $d): string
+{
+    $stmt = $conn->prepare("SELECT t.*, u.nom AS gp_nom, u.email AS gp_email, u.disponible FROM trajets t JOIN users u ON u.id = t.user_id WHERE t.id = ?");
+    $stmt->bind_param("i", $trajet_id);
+    $stmt->execute();
+    $t = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    $kilos = is_numeric($d['kilos'] ?? null) ? round((float)$d['kilos'], 1) : 0;
+    $contenu = trim($d['contenu'] ?? '');
+    $dest_nom = trim($d['destinataire_nom'] ?? '');
+    $dest_tel = vide_en_null($d['destinataire_tel'] ?? '');
+
+    if (!$t || $t['statut'] !== 'disponible' || $t['date_depart'] < date('Y-m-d')) return "!Ce trajet n'accepte plus de réservations.";
+    if ((int)$t['user_id'] === $expediteur_id) return "!Tu ne peux pas réserver sur ton propre trajet.";
+    if (!$t['disponible']) return "!Ce GP ne prend pas de colis pour le moment.";
+    if (!empty($t['date_limite_depot']) && $t['date_limite_depot'] < date('Y-m-d')) return "!La date limite de dépôt de ce trajet est passée.";
+    if ($kilos <= 0 || $kilos > 500) return "!Indique un poids valide (en kg).";
+    if ($t['kilos_total'] !== null && $kilos > (float)$t['kilos_restants']) return "!Il ne reste que " . ((float)$t['kilos_restants'] + 0) . " kg sur ce trajet.";
+    if (mb_strlen($contenu) < 3) return "!Décris le contenu du colis.";
+    if ($dest_nom === '') return "!Indique le nom du destinataire.";
+    if ($dest_tel !== null && !telephone_valide($dest_tel)) return "!Numéro du destinataire invalide.";
+
+    $code = envoi_nouveau_code($conn);
+    $prix = round($kilos * (float)$t['prix_kilo'], 2);
+    $contenu = mb_substr($contenu, 0, 255);
+    $dest_nom = mb_substr($dest_nom, 0, 100);
+    $stmt = $conn->prepare("INSERT INTO envois (code, trajet_id, gp_id, expediteur_id, kilos, prix_total, devise, contenu, destinataire_nom, destinataire_tel)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    $stmt->bind_param("siiiddssss", $code, $trajet_id, $t['user_id'], $expediteur_id, $kilos, $prix, $t['devise'], $contenu, $dest_nom, $dest_tel);
+    $stmt->execute();
+    $envoi_id = $stmt->insert_id;
+    $stmt->close();
+    envoi_ajouter_etape($conn, $envoi_id, 'demande', null, null, $expediteur_id);
+
+    email_envoyer($t['gp_email'], 'Nouvelle réservation : ' . ($kilos + 0) . ' kg - SafeGP', email_gabarit(
+        'Nouvelle demande de réservation',
+        '<p>Bonjour ' . htmlspecialchars($t['gp_nom']) . ',</p><p>Un expéditeur souhaite envoyer <strong>' . ($kilos + 0) . ' kg</strong> ('
+        . htmlspecialchars($contenu) . ') sur ton trajet <strong>' . htmlspecialchars($t['depart'] . ' → ' . $t['arrivee']) . '</strong>.</p>'
+        . '<p>Accepte ou refuse la demande depuis « Mes envois ».</p>',
+        'Voir la demande',
+        url_site() . '/envoi.php?code=' . $code
+    ));
+    return $code;
+}
+
+function envoi_ajouter_etape(mysqli $conn, int $envoi_id, string $statut, ?string $note, ?string $photo, ?int $auteur): void
+{
+    $stmt = $conn->prepare("INSERT INTO envois_etapes (envoi_id, statut, note, photo, auteur_id) VALUES (?, ?, ?, ?, ?)");
+    $stmt->bind_param("isssi", $envoi_id, $statut, $note, $photo, $auteur);
+    $stmt->execute();
+    $stmt->close();
+}
+
+// Faire avancer un envoi. Renvoie "" si c'est fait, sinon le message d'erreur.
+function envoi_changer_statut(mysqli $conn, string $code, int $moi, string $nouveau, ?string $note, ?string $photo): string
+{
+    $stmt = $conn->prepare("SELECT e.*, t.kilos_total, t.kilos_restants, t.depart, t.arrivee,
+            g.nom AS gp_nom, g.email AS gp_email, x.nom AS exp_nom, x.email AS exp_email
+        FROM envois e
+        LEFT JOIN trajets t ON t.id = e.trajet_id
+        JOIN users g ON g.id = e.gp_id
+        JOIN users x ON x.id = e.expediteur_id
+        WHERE e.code = ?");
+    $stmt->bind_param("s", $code);
+    $stmt->execute();
+    $e = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    if (!$e) return "Envoi introuvable.";
+
+    $est_gp = (int)$e['gp_id'] === $moi;
+    $est_exp = (int)$e['expediteur_id'] === $moi;
+    $permis = array_merge($est_gp ? (TRANSITIONS_GP[$e['statut']] ?? []) : [], $est_exp ? (TRANSITIONS_EXPEDITEUR[$e['statut']] ?? []) : []);
+    if (!in_array($nouveau, $permis, true)) return "Cette action n'est pas possible pour cet envoi.";
+
+    $conn->begin_transaction();
+    // Kilos du trajet : réservés à l'acceptation, rendus en cas de refus / annulation après acceptation
+    if ($e['trajet_id'] && $e['kilos_total'] !== null) {
+        if ($nouveau === 'accepte') {
+            if ((float)$e['kilos'] > (float)$e['kilos_restants']) {
+                $conn->rollback();
+                return "Il ne te reste que " . ((float)$e['kilos_restants'] + 0) . " kg sur ce trajet.";
+            }
+            $conn->query("UPDATE trajets SET kilos_restants = kilos_restants - " . (float)$e['kilos'] . " WHERE id = " . (int)$e['trajet_id']);
+        } elseif ($nouveau === 'annule' && $e['statut'] === 'accepte') {
+            $conn->query("UPDATE trajets SET kilos_restants = LEAST(kilos_total, kilos_restants + " . (float)$e['kilos'] . ") WHERE id = " . (int)$e['trajet_id']);
+        }
+    }
+    $stmt = $conn->prepare("UPDATE envois SET statut = ?, updated_at = NOW() WHERE id = ?");
+    $stmt->bind_param("si", $nouveau, $e['id']);
+    $stmt->execute();
+    $stmt->close();
+    $note = $note !== null ? mb_substr(trim($note), 0, 255) : null;
+    envoi_ajouter_etape($conn, (int)$e['id'], $nouveau, $note ?: null, $photo, $moi);
+    $conn->commit();
+
+    // On prévient l'autre personne
+    [$dest_email, $dest_nom] = $est_gp ? [$e['exp_email'], $e['exp_nom']] : [$e['gp_email'], $e['gp_nom']];
+    email_envoyer($dest_email, 'Colis ' . $code . ' : ' . libelle_statut_envoi($nouveau) . ' - SafeGP', email_gabarit(
+        libelle_statut_envoi($nouveau),
+        '<p>Bonjour ' . htmlspecialchars($dest_nom) . ',</p><p>L\'envoi <strong>' . htmlspecialchars($code) . '</strong> ('
+        . htmlspecialchars(($e['depart'] ?? '') . ' → ' . ($e['arrivee'] ?? '')) . ') a un nouveau statut : <strong>'
+        . htmlspecialchars(libelle_statut_envoi($nouveau)) . '</strong>.</p>' . ($note ? '<p>Note : ' . htmlspecialchars($note) . '</p>' : ''),
+        'Voir l\'envoi',
+        url_site() . '/envoi.php?code=' . $code
+    ));
+    return "";
+}
+
+// Frise des étapes d'un envoi : [statut => date ou null]
+function envoi_frise(array $etapes): array
+{
+    $dates = [];
+    foreach ($etapes as $et) $dates[$et['statut']] = $et['created_at'];
+    $frise = [];
+    foreach (ETAPES_ENVOI as $s) $frise[$s] = $dates[$s] ?? null;
+    return $frise;
 }

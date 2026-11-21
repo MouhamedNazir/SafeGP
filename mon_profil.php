@@ -116,8 +116,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['changer_mdp'])) {
     $nouveau = $_POST['mdp_nouveau'] ?? '';
     if (!password_verify($actuel, $user['mot_de_passe'])) {
         $erreur = "Mot de passe actuel incorrect.";
-    } elseif (strlen($nouveau) < 8) {
-        $erreur = "Le nouveau mot de passe doit faire au moins 8 caractères.";
+    } elseif ($probleme = mot_de_passe_probleme($nouveau, [$user['nom'], $user['username'], $user['email']])) {
+        $erreur = $probleme;
     } elseif ($nouveau !== ($_POST['mdp_confirmation'] ?? '')) {
         $erreur = "Les deux nouveaux mots de passe ne correspondent pas.";
     } else {
@@ -146,8 +146,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['changer_email'])) {
 
     if (!password_verify($_POST['mdp_email'] ?? '', $user['mot_de_passe'])) {
         $erreur = "Mot de passe incorrect.";
-    } elseif (!filter_var($nouvel_email, FILTER_VALIDATE_EMAIL)) {
-        $erreur = "Adresse e-mail invalide.";
+    } elseif ($probleme = email_probleme($nouvel_email)) {
+        $erreur = $probleme;
     } elseif (strcasecmp($nouvel_email, $user['email']) === 0) {
         $erreur = "C'est déjà ton adresse actuelle.";
     } elseif ($pris) {
@@ -301,6 +301,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['nom'])) {
     }
 }
 
+
+// Abonnements encore annulables (calculé avant de fermer la connexion)
+$annulables = [];
+foreach ($historique_abonnements as $h) {
+    if ($h['statut'] === 'valide' && !abonnement_annulation_impossible($conn, $h)) $annulables[$h['id']] = true;
+}
 $conn->close();
 ?>
 
@@ -407,12 +413,18 @@ $conn->close();
 
         <!-- MON ABONNEMENT -->
         <h3 id="abonnement" class="titre-section">Mon abonnement</h3>
+        <?php $msg_annulation = $_SESSION['message_annulation'] ?? null; unset($_SESSION['message_annulation']); ?>
+        <?php if ($msg_annulation === 'ok'): ?>
+            <p class="success"><i class="fa-solid fa-circle-check"></i> Abonnement annulé : tu seras remboursé sous quelques jours.</p>
+        <?php elseif ($msg_annulation): ?>
+            <p class="erreur"><i class="fa-solid fa-circle-xmark"></i> <?= e($msg_annulation) ?></p>
+        <?php endif; ?>
         <?php include 'quota_bandeau.php'; ?>
         <p><a href="tarifs.php" class="btn-contact"><i class="fa-solid fa-crown"></i> <?= $quota['formule'] === 'gratuit' ? 'Voir les formules' : 'Prolonger ou changer de formule' ?></a></p>
         <?php if ($historique_abonnements): ?>
             <div class="table-defilante">
             <table class="admin-table">
-                <thead><tr><th>Date</th><th>Formule</th><th>Montant</th><th>Statut</th></tr></thead>
+                <thead><tr><th>Date</th><th>Formule</th><th>Montant</th><th>Statut</th><th></th></tr></thead>
                 <tbody>
                 <?php foreach ($historique_abonnements as $h): ?>
                     <tr>
@@ -422,7 +434,20 @@ $conn->close();
                         <td>
                             <?php if ($h['statut'] === 'en_attente'): ?><span class="statut-attente">En cours de vérification</span>
                             <?php elseif ($h['statut'] === 'valide'): ?><span class="statut-ok">Validé</span> <small class="texte-doux-bloc">jusqu'au <?= date('d/m/Y', strtotime($h['date_fin'])) ?></small>
+                            <?php elseif ($h['statut'] === 'annule'): ?><span class="statut-refus">Annulé</span> <small class="texte-doux-bloc"><?= $h['rembourse_le'] ? 'Remboursé le ' . date('d/m/Y', strtotime($h['rembourse_le'])) : 'Remboursement en cours' ?></small>
                             <?php else: ?><span class="statut-refus">Refusé</span> <small class="texte-doux-bloc"><?= e($h['motif_refus']) ?></small><?php endif; ?>
+                        </td>
+                        <td class="actions-abonnement">
+                            <?php if (in_array($h['statut'], ['valide', 'annule'], true)): ?>
+                                <a href="recu.php?id=<?= (int)$h['id'] ?>" class="btn-lien" target="_blank"><i class="fa-solid fa-receipt"></i> Reçu</a>
+                            <?php endif; ?>
+                            <?php if (isset($annulables[$h['id']])): ?>
+                                <form action="annuler_abonnement.php" method="POST" class="form-inline" onsubmit="return confirm('Annuler cet abonnement ? Tu repasses à ta formule précédente et tu es remboursé.')">
+                                    <?= csrf_field() ?>
+                                    <button type="submit" name="abonnement_id" value="<?= (int)$h['id'] ?>" class="btn-lien lien-annuler"><i class="fa-solid fa-rotate-left"></i> Annuler
+                                        <small>(jusqu'au <?= date('d/m/Y H:i', strtotime($h['traite_le']) + ANNULATION_HEURES * 3600) ?>)</small></button>
+                                </form>
+                            <?php endif; ?>
                         </td>
                     </tr>
                 <?php endforeach; ?>
@@ -485,7 +510,7 @@ $conn->close();
                 <div class="form-row">
                     <div class="form-group">
                         <label>Nouveau mot de passe</label>
-                        <input type="password" name="mdp_nouveau" minlength="8" required autocomplete="new-password" placeholder="Au moins 8 caractères">
+                        <input type="password" name="mdp_nouveau" minlength="8" data-jauge required autocomplete="new-password" placeholder="Au moins 8 caractères">
                     </div>
                     <div class="form-group">
                         <label>Confirmer</label>

@@ -3,6 +3,7 @@ require_once 'init.php';
 
 $success = false;
 $email_envoye = false;
+$suggestion_email = null;
 $erreur = "";
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
@@ -15,11 +16,15 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     if ($nom === '' || mb_strlen($nom) > 100) {
         $erreur = "Indique ton nom complet.";
 
-    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        $erreur = "Adresse e-mail invalide.";
+    } elseif ($probleme_email = email_probleme($email)) {
+        $erreur = $probleme_email;
 
-    } elseif (strlen($mot_de_passe) < 8) {
-        $erreur = "Le mot de passe doit faire au moins 8 caractères.";
+    // Faute de frappe probable (gmial.com...) : on demande confirmation une fois
+    } elseif (($suggestion_email = email_suggestion($email)) && ($_POST['email_ok'] ?? '') !== $email) {
+        $erreur = "Vérifie ton adresse e-mail.";
+
+    } elseif ($probleme_mdp = mot_de_passe_probleme($mot_de_passe, [$nom, $username, $email])) {
+        $erreur = $probleme_mdp;
 
     } elseif (empty($_POST['cgu'])) {
         $erreur = "Merci d'accepter les conditions d'utilisation.";
@@ -127,11 +132,19 @@ $conn->close();
                 <input type="email" name="email" 
                     value="<?= htmlspecialchars($_POST['email'] ?? '') ?>"
                     placeholder="Ex: mamadou@gmail.com" required>
+                <?php if ($suggestion_email && !$success): ?>
+                    <div class="suggestion-email">
+                        Vouliez-vous dire <strong><?= e($suggestion_email) ?></strong> ?
+                        <button type="button" class="btn-lien" data-remplacer-email="<?= e($suggestion_email) ?>">Utiliser cette adresse</button>
+                        <small>Si ton adresse est correcte, renvoie simplement le formulaire.</small>
+                        <input type="hidden" name="email_ok" value="<?= e($_POST['email'] ?? '') ?>">
+                    </div>
+                <?php endif; ?>
             </div>
 
             <div class="form-group">
                 <label>Mot de passe</label>
-                <input type="password" name="mot_de_passe" 
+                <input type="password" name="mot_de_passe" data-jauge 
                     placeholder="Au moins 8 caractères" minlength="8" required>
             </div>
 

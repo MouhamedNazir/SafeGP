@@ -12,8 +12,9 @@ if ($user_id && $_SERVER["REQUEST_METHOD"] == "POST") {
     $mot_de_passe = $_POST['mot_de_passe'] ?? '';
     $confirmation = $_POST['confirmation'] ?? '';
 
-    if (strlen($mot_de_passe) < 8) {
-        $erreur = "Le mot de passe doit faire au moins 8 caractères.";
+    $infos = $conn->query("SELECT nom, username, email FROM users WHERE id = " . (int)$user_id)->fetch_row() ?: [];
+    if ($probleme = mot_de_passe_probleme($mot_de_passe, $infos)) {
+        $erreur = $probleme;
     } elseif ($mot_de_passe !== $confirmation) {
         $erreur = "Les mots de passe ne correspondent pas.";
     } else {
@@ -53,7 +54,7 @@ $conn->close();
                 <?= csrf_field() ?>
                 <div class="form-group">
                     <label>Nouveau mot de passe</label>
-                    <input type="password" name="mot_de_passe" minlength="8" placeholder="Au moins 8 caractères" required>
+                    <input type="password" name="mot_de_passe" minlength="8" placeholder="Au moins 8 caractères" required data-jauge>
                 </div>
                 <div class="form-group">
                     <label>Confirmer le mot de passe</label>

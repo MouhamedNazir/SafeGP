@@ -41,17 +41,26 @@ $conn->close();
         <li><strong>Gratuit</strong> : <?= FORMULES['gratuit']['limite'] ?> trajets publiés par mois calendaire.</li>
         <li><strong>Standard</strong> : <?= FORMULES['standard']['limite'] ?> trajets par mois — <?= e(prix_fcfa(FORMULES['standard']['prix_mois'])) ?>/mois ou <?= e(prix_fcfa(FORMULES['standard']['prix_an'])) ?>/an.</li>
         <li><strong>Illimité</strong> : trajets illimités — <?= e(prix_fcfa(FORMULES['illimite']['prix_mois'])) ?>/mois ou <?= e(prix_fcfa(FORMULES['illimite']['prix_an'])) ?>/an.</li>
-        <li>Le paiement se fait par mobile money (Wave, Orange Money). L'abonnement est activé après vérification du paiement, pour la durée choisie, sans renouvellement automatique.</li>
+        <li>Le paiement se fait par mobile money (Wave, Orange Money) ou par virement. L'abonnement est activé après vérification du paiement, pour la durée choisie, sans renouvellement automatique. Un reçu est disponible dans « Mon profil ».</li>
         <li>À la fin de la période, le compte repasse en formule Gratuite ; les trajets déjà publiés restent en ligne.</li>
-        <li>Une période commencée n'est pas remboursable, sauf erreur de notre part. Pour toute réclamation, utilise la page <a href="retours.php?type=autre">Donner mon avis</a>.</li>
+        <li><strong>Annulation</strong> : tu peux annuler un abonnement dans les <strong><?= ANNULATION_HEURES ?> heures</strong> qui suivent son activation, à condition de n'avoir publié aucun trajet depuis. Tu es alors remboursé, par le moyen utilisé pour payer, et ton compte revient à sa formule précédente. Passé ce délai, la période n'est pas remboursable, sauf erreur de notre part.</li>
+        <li>Pour toute réclamation, utilise la page <a href="retours.php?type=autre">Donner mon avis</a>.</li>
     </ul>
 
-    <h3>5. Données personnelles</h3>
+    <h3>5. Réservations et suivi des colis</h3>
+    <ul>
+        <li>Un expéditeur peut réserver des kilos sur un trajet ; le GP accepte ou refuse la demande. Chacun peut annuler tant que le colis n'a pas été déposé.</li>
+        <li>Le GP indique les étapes (dépôt, départ, arrivée, remise) et peut joindre une photo comme preuve. Un code de suivi permet au destinataire de suivre le colis.</li>
+        <li>Le reçu de dépôt atteste que le GP a reçu le colis décrit ; le prix est réglé directement entre le GP et l'expéditeur. SafeGP n'est pas partie à ce contrat de transport.</li>
+        <li>L'expéditeur est responsable de la description exacte du contenu ; le GP peut refuser un colis dont le contenu lui semble douteux.</li>
+    </ul>
+
+    <h3>6. Données personnelles</h3>
     <p>Nous conservons les informations nécessaires au service : nom, nom d'utilisateur, e-mail, numéros de contact, photo, trajets, messages et paiements.
         Les numéros affichés sur tes annonces sont visibles par les visiteurs. Tes données ne sont ni vendues ni cédées.
         La suppression de ton compte efface ton profil, tes trajets, tes numéros et tes messages.</p>
 
-    <h3>6. Contact</h3>
+    <h3>7. Contact</h3>
     <p>Pour toute question : <a href="retours.php">Donner mon avis</a>.</p>
 </section>
 

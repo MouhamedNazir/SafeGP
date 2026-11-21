@@ -131,12 +131,17 @@ CREATE TABLE `abonnements` (
   `moyen` enum('wave','orange_money','virement','autre') NOT NULL,
   `reference` varchar(100) NOT NULL,
   `telephone` varchar(20) DEFAULT NULL,
-  `statut` enum('en_attente','valide','refuse') NOT NULL DEFAULT 'en_attente',
+  `preuve` varchar(100) DEFAULT NULL,
+  `statut` enum('en_attente','valide','refuse','annule') NOT NULL DEFAULT 'en_attente',
   `motif_refus` varchar(255) DEFAULT NULL,
   `date_debut` date DEFAULT NULL,
   `date_fin` date DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `traite_le` datetime DEFAULT NULL,
+  `formule_avant` enum('gratuit','standard','illimite') DEFAULT NULL,
+  `fin_avant` date DEFAULT NULL,
+  `annule_le` datetime DEFAULT NULL,
+  `rembourse_le` datetime DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `user_id` (`user_id`),
   KEY `statut` (`statut`),
@@ -189,6 +194,42 @@ CREATE TABLE `verifications` (
   KEY `user_id` (`user_id`),
   KEY `statut` (`statut`),
   CONSTRAINT `verifications_user_fk` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+CREATE TABLE `envois` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `code` char(9) NOT NULL,
+  `trajet_id` int(11) DEFAULT NULL,
+  `gp_id` int(11) NOT NULL,
+  `expediteur_id` int(11) NOT NULL,
+  `kilos` decimal(6,1) NOT NULL,
+  `prix_total` decimal(10,2) NOT NULL,
+  `devise` enum('MAD','EUR','USD','XOF','XAF','GBP','CAD','CHF') NOT NULL DEFAULT 'MAD',
+  `contenu` varchar(255) NOT NULL,
+  `destinataire_nom` varchar(100) NOT NULL,
+  `destinataire_tel` varchar(20) DEFAULT NULL,
+  `statut` enum('demande','accepte','refuse','annule','depose','en_route','arrive','remis') NOT NULL DEFAULT 'demande',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `code` (`code`),
+  KEY `trajet_id` (`trajet_id`),
+  KEY `gp_id` (`gp_id`),
+  KEY `expediteur_id` (`expediteur_id`),
+  CONSTRAINT `envois_expediteur_fk` FOREIGN KEY (`expediteur_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `envois_gp_fk` FOREIGN KEY (`gp_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `envois_trajet_fk` FOREIGN KEY (`trajet_id`) REFERENCES `trajets` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+CREATE TABLE `envois_etapes` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `envoi_id` int(11) NOT NULL,
+  `statut` enum('demande','accepte','refuse','annule','depose','en_route','arrive','remis') NOT NULL,
+  `note` varchar(255) DEFAULT NULL,
+  `photo` varchar(100) DEFAULT NULL,
+  `auteur_id` int(11) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `envoi_id` (`envoi_id`),
+  CONSTRAINT `etapes_envoi_fk` FOREIGN KEY (`envoi_id`) REFERENCES `envois` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 SET FOREIGN_KEY_CHECKS = 1;

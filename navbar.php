@@ -22,7 +22,7 @@
     <!-- Bouton menu (visible seulement sur mobile) -->
     <button type="button" class="nav-burger" aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="nav-liens">
         <i class="fa-solid fa-bars"></i>
-        <?php if (!empty($nav_messages_non_lus) || !empty($nav_retours_non_lus)): ?><span class="burger-point"></span><?php endif; ?>
+        <?php if (!empty($nav_messages_non_lus) || !empty($nav_retours_non_lus) || !empty($nav_envois_a_traiter)): ?><span class="burger-point"></span><?php endif; ?>
     </button>
     </div>
 
@@ -45,6 +45,8 @@
                 <ul class="dropdown-menu">
                     <li><a href="mon_profil.php"><i class="fa-solid fa-user"></i> Mon profil</a></li>
                     <li><a href="dashboard.php"><i class="fa-solid fa-list"></i> Mes trajets</a></li>
+                    <li><a href="envois.php"><i class="fa-solid fa-boxes-stacked"></i> Mes envois<?php if (!empty($nav_envois_a_traiter)): ?><span class="badge-nonlu" title="Réservations à traiter"><?= (int)$nav_envois_a_traiter ?></span><?php endif; ?></a></li>
+                    <li><a href="suivi.php"><i class="fa-solid fa-magnifying-glass-location"></i> Suivre un colis</a></li>
                     <li><a href="publier.php"><i class="fa-solid fa-plus"></i> Publier</a></li>
                     <li class="separateur" role="separator"></li>
                     <?php if (!empty($nav_is_admin)): ?>

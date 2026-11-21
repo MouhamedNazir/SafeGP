@@ -28,31 +28,32 @@ if (!headers_sent()) {
     header('Permissions-Policy: camera=(), microphone=(), geolocation=()');
 }
 
-// Une fois par jour : les trajets dont la date d'arrivée est passée
-// passent automatiquement au statut « arrivé »
-$drapeau_maj = __DIR__ . '/logs/maj_trajets.txt';
-if (@file_get_contents($drapeau_maj) !== date('Y-m-d')) {
-    $conn->query("UPDATE trajets SET statut = 'arrivé' WHERE date_arrivee < CURDATE() AND statut <> 'arrivé'");
-    @file_put_contents($drapeau_maj, date('Y-m-d'));
-}
-
 require_once __DIR__ . '/csrf.php';      // démarre la session (cookie sécurisé)
 demarrer_traduction();                    // en anglais : la page est traduite avant l'envoi
 require_once __DIR__ . '/pays.php';
 require_once __DIR__ . '/fonctions.php';
 require_once __DIR__ . '/email.php';
+
+// Une fois par jour : petites tâches de ménage (voir taches_quotidiennes())
+$drapeau_maj = __DIR__ . '/logs/maj_quotidienne.txt';
+if (@file_get_contents($drapeau_maj) !== date('Y-m-d')) {
+    @file_put_contents($drapeau_maj, date('Y-m-d'));
+    taches_quotidiennes($conn);
+}
 csrf_verify(); // bloque tout POST sans jeton CSRF valide
 
 // Infos de l'utilisateur connecté pour la navbar, lues en base
 // (pas seulement en session) tant que la connexion est ouverte
 $nav_is_admin = false;
 $nav_messages_non_lus = 0;
+$nav_envois_a_traiter = 0;
 $nav_abonnement_fin = null;
 $nav_email_a_confirmer = false;
 if (isset($_SESSION['user_id'])) {
     $check_admin = $conn->prepare("
         SELECT id, nom, email, role, email_verifie, formule, abonnement_fin, rappel_abonnement,
-               (SELECT COUNT(*) FROM messages WHERE destinataire_id = users.id AND lu = 0) AS non_lus
+               (SELECT COUNT(*) FROM messages WHERE destinataire_id = users.id AND lu = 0) AS non_lus,
+               (SELECT COUNT(*) FROM envois WHERE gp_id = users.id AND statut = 'demande') AS envois_a_traiter
         FROM users WHERE id = ?");
     $check_admin->bind_param("i", $_SESSION['user_id']);
     $check_admin->execute();
@@ -73,6 +74,7 @@ if (isset($_SESSION['user_id'])) {
     } else {
         $nav_is_admin = $check_role['role'] === 'admin';
         $nav_messages_non_lus = (int)$check_role['non_lus'];
+        $nav_envois_a_traiter = (int)$check_role['envois_a_traiter'];
         $nav_email_a_confirmer = !$check_role['email_verifie'] && email_actif();
 
         // Abonnement qui se termine dans 3 jours ou moins : bandeau + e-mail (une fois)
@@ -101,6 +103,6 @@ if (isset($_SESSION['user_id'])) {
 $nav_retours_non_lus = 0;
 if ($nav_is_admin) {
     $nav_retours_non_lus = (int)$conn->query("SELECT COUNT(*) FROM retours WHERE lu = 0")->fetch_row()[0]
-        + (int)$conn->query("SELECT COUNT(*) FROM abonnements WHERE statut = 'en_attente'")->fetch_row()[0]
+        + (int)$conn->query("SELECT COUNT(*) FROM abonnements WHERE statut = 'en_attente' OR (statut = 'annule' AND rembourse_le IS NULL)")->fetch_row()[0]
         + (int)$conn->query("SELECT COUNT(*) FROM verifications WHERE statut = 'en_attente'")->fetch_row()[0];
 }

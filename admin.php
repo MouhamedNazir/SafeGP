@@ -138,6 +138,15 @@ if (isset($_POST['valider_abonnement'])) {
     header("Location: admin.php?success=" . ($ok ? 'abonnement_valide' : 'abonnement_deja_traite') . "#abonnements");
     exit();
 }
+if (isset($_POST['marquer_rembourse'])) {
+    $aid = (int)$_POST['marquer_rembourse'];
+    $stmt = $conn->prepare("UPDATE abonnements SET rembourse_le = NOW() WHERE id = ? AND statut = 'annule' AND rembourse_le IS NULL");
+    $stmt->bind_param("i", $aid);
+    $stmt->execute();
+    $stmt->close();
+    header("Location: admin.php?success=rembourse#abonnements");
+    exit();
+}
 if (isset($_POST['refuser_abonnement'])) {
     abonnement_refuser($conn, (int)$_POST['refuser_abonnement'], (string)($_POST['motif'] ?? ''));
     header("Location: admin.php?success=abonnement_refuse#abonnements");
@@ -208,9 +217,9 @@ $stmt->close();
 $demandes = $conn->query("
     SELECT a.*, u.nom, u.username, u.email
     FROM abonnements a JOIN users u ON u.id = a.user_id
-    ORDER BY (a.statut = 'en_attente') DESC, a.id DESC
+    ORDER BY (a.statut = 'en_attente' OR (a.statut = 'annule' AND a.rembourse_le IS NULL)) DESC, a.id DESC
     LIMIT 40")->fetch_all(MYSQLI_ASSOC);
-$demandes_en_attente = count(array_filter($demandes, fn($d) => $d['statut'] === 'en_attente'));
+$demandes_en_attente = count(array_filter($demandes, fn($d) => $d['statut'] === 'en_attente' || ($d['statut'] === 'annule' && !$d['rembourse_le'])));
 $revenus_mois = (int)$conn->query("SELECT COALESCE(SUM(montant), 0) FROM abonnements WHERE statut = 'valide' AND traite_le >= '" . date('Y-m-01') . "'")->fetch_row()[0];
 $abonnes_actifs = (int)$conn->query("SELECT COUNT(*) FROM users WHERE formule <> 'gratuit' AND (abonnement_fin IS NULL OR abonnement_fin >= CURDATE())")->fetch_row()[0];
 
@@ -270,6 +279,7 @@ $conn->close();
                 if ($_GET['success'] == 'abonnement_valide') echo "Abonnement validé et activé, le membre a été prévenu par e-mail.";
                 if ($_GET['success'] == 'abonnement_refuse') echo "Demande refusée, le membre a été prévenu par e-mail.";
                 if ($_GET['success'] == 'abonnement_deja_traite') echo "Cette demande avait déjà été traitée.";
+                if ($_GET['success'] == 'rembourse') echo "Remboursement enregistré.";
                 if ($_GET['success'] == 'verification_traitee') echo "Vérification traitée, la pièce d'identité a été supprimée.";
                 if ($_GET['success'] == 'badge_retire') echo "Badge « vérifié » retiré.";
                 if ($_GET['success'] == 'retour_supprime') echo "Retour supprimé !";
@@ -524,7 +534,8 @@ $conn->close();
                 <td><a href="profil.php?id=<?= (int)$d['user_id'] ?>">@<?= e($d['username'] ?? $d['nom']) ?></a><br><small class="texte-doux-bloc"><?= e($d['email']) ?></small></td>
                 <td><?= e(FORMULES[$d['formule']]['nom']) ?> · <?= $d['duree'] === 'an' ? '1 an' : '1 mois' ?></td>
                 <td><strong><?= e(prix_fcfa((int)$d['montant'])) ?></strong></td>
-                <td><?= e(MOYENS_PAIEMENT[$d['moyen']]) ?><br><code><?= e($d['reference']) ?></code><?php if ($d['telephone']): ?><br><small><?= e($d['telephone']) ?></small><?php endif; ?></td>
+                <td><?= e(MOYENS_PAIEMENT[$d['moyen']]) ?><br><code><?= e($d['reference']) ?></code><?php if ($d['telephone']): ?><br><small><?= e($d['telephone']) ?></small><?php endif; ?>
+                    <?php if ($d['preuve']): ?><br><a href="fichier_prive.php?type=preuve&amp;id=<?= (int)$d['id'] ?>" target="_blank" rel="noopener" class="lien-preuve"><i class="fa-solid fa-image"></i> Voir la preuve</a><?php endif; ?></td>
                 <td>
                     <?php if ($d['statut'] === 'en_attente'): ?>
                         <form action="admin.php" method="POST" class="form-inline" onsubmit="return confirm('Paiement vérifié ? L\'abonnement sera activé.')">
@@ -541,6 +552,17 @@ $conn->close();
                         </details>
                     <?php elseif ($d['statut'] === 'valide'): ?>
                         <span class="statut-ok">Validé</span><br><small class="texte-doux-bloc">du <?= date('d/m/Y', strtotime($d['date_debut'])) ?> au <?= date('d/m/Y', strtotime($d['date_fin'])) ?></small>
+                        <br><a href="recu.php?id=<?= (int)$d['id'] ?>" target="_blank" class="btn-lien"><i class="fa-solid fa-receipt"></i> Reçu</a>
+                    <?php elseif ($d['statut'] === 'annule'): ?>
+                        <span class="statut-refus">Annulé</span><br><small class="texte-doux-bloc">le <?= date('d/m/Y H:i', strtotime($d['annule_le'])) ?></small>
+                        <?php if ($d['rembourse_le']): ?>
+                            <br><small class="statut-ok">Remboursé le <?= date('d/m/Y', strtotime($d['rembourse_le'])) ?></small>
+                        <?php else: ?>
+                            <form action="admin.php" method="POST" class="form-inline" onsubmit="return confirm('Remboursement effectué ?')">
+                                <?= csrf_field() ?>
+                                <button type="submit" name="marquer_rembourse" value="<?= (int)$d['id'] ?>" class="btn-contact btn-petit"><i class="fa-solid fa-money-bill-transfer"></i> Marquer remboursé</button>
+                            </form>
+                        <?php endif; ?>
                     <?php else: ?>
                         <span class="statut-refus">Refusé</span><br><small class="texte-doux-bloc"><?= e($d['motif_refus']) ?></small>
                     <?php endif; ?>

@@ -232,5 +232,51 @@ document.addEventListener('DOMContentLoaded', function () {
             navigator.share({title: natif.dataset.titre, text: natif.dataset.texte, url: natif.dataset.lien}).catch(function () {});
         });
     }
+
+    // ---------- Jauge de solidité du mot de passe ----------
+    document.querySelectorAll('input[data-jauge]').forEach(function (champ) {
+        const jauge = document.createElement('div');
+        jauge.className = 'jauge-mdp';
+        jauge.innerHTML = '<span></span><small></small>';
+        champ.insertAdjacentElement('afterend', jauge);
+        const niveaux = [T.mdpFaible || 'Trop faible', T.mdpMoyen || 'Moyen', T.mdpBon || 'Bon', T.mdpFort || 'Fort'];
+        champ.addEventListener('input', function () {
+            const v = champ.value;
+            let score = 0;
+            if (v.length >= 8) score++;
+            if (v.length >= 12) score++;
+            if (/\p{L}/u.test(v) && /\d/.test(v)) score++;
+            if (/[A-Z]/.test(v) && /[a-z]/.test(v) || /[^\p{L}\d]/u.test(v)) score++;
+            if (v.length < 8 || !/\d/.test(v) || !/\p{L}/u.test(v)) score = Math.min(score, 1);
+            const niveau = Math.max(0, score - 1);
+            jauge.dataset.niveau = v ? niveau : '';
+            jauge.querySelector('small').textContent = v ? niveaux[niveau] : '';
+        });
+    });
+
+    // ---------- Inscription : utiliser l'adresse e-mail suggérée ----------
+    document.querySelectorAll('[data-remplacer-email]').forEach(function (bouton) {
+        bouton.addEventListener('click', function () {
+            const champ = bouton.closest('form').querySelector('input[name="email"]');
+            champ.value = bouton.dataset.remplacerEmail;
+            bouton.closest('.suggestion-email').remove();
+            champ.focus();
+        });
+    });
+
+    // ---------- Réservation : prix estimé pendant la saisie du poids ----------
+    const champKilos = document.querySelector('input[name="kilos"][data-prix-kilo]');
+    const estimation = document.querySelector('.estimation-prix');
+    if (champKilos && estimation) {
+        champKilos.addEventListener('input', function () {
+            const kg = parseFloat(champKilos.value.replace(',', '.'));
+            const prix = kg * parseFloat(champKilos.dataset.prixKilo);
+            estimation.hidden = !(kg > 0);
+            if (kg > 0) {
+                estimation.querySelector('strong').textContent =
+                    prix.toLocaleString(document.documentElement.lang || 'fr', {maximumFractionDigits: 2}) + ' ' + champKilos.dataset.devise;
+            }
+        });
+    }
 });
 
