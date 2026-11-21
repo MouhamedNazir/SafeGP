@@ -66,12 +66,7 @@ $conn->close();
             <?php foreach ($membres as $m): ?>
             <a href="profil.php?id=<?= (int)$m['id'] ?>" class="gp-card">
                 <div class="gp-card-avatar">
-                    <?php if (!empty($m['photo'])): ?>
-                        <img src="uploads/<?= e($m['photo']) ?>" alt=""
-                             style="width:70px; height:70px; border-radius:50%; object-fit:cover;">
-                    <?php else: ?>
-                        <?= e(strtoupper(mb_substr($m['nom'], 0, 1))) ?>
-                    <?php endif; ?>
+                    <?= avatar($m['nom'], $m['photo']) ?>
                 </div>
                 <div class="gp-card-info">
                     <h4><?= e($m['nom']) ?></h4>

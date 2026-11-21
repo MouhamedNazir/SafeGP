@@ -3,8 +3,6 @@
 // FONCTIONS COMMUNES — chargées par init.php sur toutes les pages
 // ============================================================
 
-// Un compte gratuit peut publier au plus 5 trajets par mois calendaire
-const FREEMIUM_LIMITE_MOIS = 5;
 
 // Nombre maximum de numéros WhatsApp (profil ou trajet)
 const CONTACTS_MAX = 5;
@@ -291,16 +289,63 @@ function contacts_pour_trajets(mysqli $conn, array $trajets): array
 }
 
 // ============================================================
-// FREEMIUM
+// ABONNEMENTS
+// Gratuit : 4 publications par mois calendaire
+// Standard : 8 par mois — 500 FCFA/mois ou 5 000 FCFA/an (2 mois offerts)
+// Illimité : sans limite — 750 FCFA/mois ou 7 500 FCFA/an (2 mois offerts)
 // ============================================================
+const FORMULES = [
+    'gratuit'  => ['nom' => 'Gratuit',  'limite' => 4,    'prix_mois' => 0,   'prix_an' => 0],
+    'standard' => ['nom' => 'Standard', 'limite' => 8,    'prix_mois' => 500, 'prix_an' => 5000],
+    'illimite' => ['nom' => 'Illimité', 'limite' => null, 'prix_mois' => 750, 'prix_an' => 7500],
+];
 
-// Renvoie ['illimite' => bool, 'utilisees' => int, 'restantes' => int|null]
+// Taux indicatifs pour afficher l'équivalent des prix en FCFA.
+// L'euro est à parité fixe (1 € = 655,957 FCFA) ; dollar et dirham
+// sont approximatifs : à ajuster de temps en temps.
+const TAUX_FCFA = [
+    'EUR' => 655.957,
+    'USD' => 600,
+    'MAD' => 60,
+];
+
+const MOYENS_PAIEMENT = ['wave' => 'Wave', 'orange_money' => 'Orange Money', 'autre' => 'Autre'];
+
+function prix_fcfa(int $montant): string
+{
+    return number_format($montant, 0, ',', ' ') . ' FCFA';
+}
+
+// "≈ 0,76 € · 0,83 $ · 8 DH"
+function equivalents_prix(int $montant_fcfa): string
+{
+    $fmt = fn($v) => rtrim(rtrim(number_format($v, 2, ',', ' '), '0'), ',');
+    return '≈ ' . $fmt($montant_fcfa / TAUX_FCFA['EUR']) . ' € · '
+         . $fmt($montant_fcfa / TAUX_FCFA['USD']) . ' $ · '
+         . $fmt(round($montant_fcfa / TAUX_FCFA['MAD'])) . ' DH';
+}
+
+function prix_formule(string $formule, string $duree): int
+{
+    return (int)(FORMULES[$formule][$duree === 'an' ? 'prix_an' : 'prix_mois'] ?? 0);
+}
+
+// Formule réellement active : une formule payante expirée redevient « gratuit »
+function formule_active(array $u): string
+{
+    $f = $u['formule'] ?? 'gratuit';
+    if ($f === 'gratuit' || !isset(FORMULES[$f])) return 'gratuit';
+    if (!empty($u['abonnement_fin']) && $u['abonnement_fin'] < date('Y-m-d')) return 'gratuit';
+    return $f;
+}
+
+// Renvoie ['formule', 'nom', 'limite', 'illimite', 'utilisees', 'restantes', 'fin']
 function quota_publication(mysqli $conn, int $user_id): array
 {
-    $stmt = $conn->prepare("SELECT role, premium FROM users WHERE id = ?");
+    $stmt = $conn->prepare("SELECT role, formule, abonnement_fin FROM users WHERE id = ?");
     $stmt->bind_param("i", $user_id);
     $stmt->execute();
-    $u = $stmt->get_result()->fetch_assoc();
+    $u = $stmt->get_result()->fetch_assoc() ?: [];
     $stmt->close();
 
     $debut_mois = date('Y-m-01 00:00:00');
@@ -310,12 +355,85 @@ function quota_publication(mysqli $conn, int $user_id): array
     $utilisees = (int)$stmt->get_result()->fetch_assoc()['n'];
     $stmt->close();
 
-    $illimite = $u && ($u['premium'] || $u['role'] === 'admin');
+    $formule = formule_active($u);
+    $limite = FORMULES[$formule]['limite'];
+    $illimite = $limite === null || ($u['role'] ?? '') === 'admin';
     return [
+        'formule'   => $formule,
+        'nom'       => FORMULES[$formule]['nom'],
+        'limite'    => $limite,
         'illimite'  => $illimite,
         'utilisees' => $utilisees,
-        'restantes' => $illimite ? null : max(0, FREEMIUM_LIMITE_MOIS - $utilisees),
+        'restantes' => $illimite ? null : max(0, $limite - $utilisees),
+        'fin'       => $formule !== 'gratuit' ? ($u['abonnement_fin'] ?? null) : null,
     ];
+}
+
+// Active une demande d'abonnement validée par l'admin.
+// Même formule encore active → on prolonge à partir de la fin actuelle ;
+// sinon on démarre aujourd'hui.
+function abonnement_valider(mysqli $conn, int $demande_id): ?array
+{
+    $stmt = $conn->prepare("SELECT a.*, u.formule AS formule_actuelle, u.abonnement_fin, u.email, u.nom
+        FROM abonnements a JOIN users u ON u.id = a.user_id
+        WHERE a.id = ? AND a.statut = 'en_attente'");
+    $stmt->bind_param("i", $demande_id);
+    $stmt->execute();
+    $d = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    if (!$d) return null;
+
+    $aujourdhui = date('Y-m-d');
+    $prolonge = $d['formule_actuelle'] === $d['formule'] && !empty($d['abonnement_fin']) && $d['abonnement_fin'] >= $aujourdhui;
+    $debut = $prolonge ? date('Y-m-d', strtotime($d['abonnement_fin'] . ' +1 day')) : $aujourdhui;
+    $fin = date('Y-m-d', strtotime($debut . ($d['duree'] === 'an' ? ' +1 year' : ' +1 month') . ' -1 day'));
+
+    $conn->begin_transaction();
+    $stmt = $conn->prepare("UPDATE abonnements SET statut = 'valide', date_debut = ?, date_fin = ?, traite_le = NOW() WHERE id = ?");
+    $stmt->bind_param("ssi", $debut, $fin, $demande_id);
+    $stmt->execute();
+    $stmt->close();
+    $stmt = $conn->prepare("UPDATE users SET formule = ?, abonnement_fin = ?, rappel_abonnement = NULL WHERE id = ?");
+    $stmt->bind_param("ssi", $d['formule'], $fin, $d['user_id']);
+    $stmt->execute();
+    $stmt->close();
+    $conn->commit();
+
+    email_envoyer($d['email'], 'Ton abonnement ' . FORMULES[$d['formule']]['nom'] . ' est actif - SafeGP', email_gabarit(
+        'Abonnement activé',
+        '<p>Bonjour ' . htmlspecialchars($d['nom']) . ',</p><p>Ton paiement a été vérifié : ta formule <strong>'
+        . htmlspecialchars(FORMULES[$d['formule']]['nom']) . '</strong> est active jusqu\'au <strong>'
+        . date('d/m/Y', strtotime($fin)) . '</strong>. Merci pour ta confiance !</p>',
+        'Publier un trajet',
+        url_site() . '/publier.php'
+    ));
+    return ['debut' => $debut, 'fin' => $fin];
+}
+
+function abonnement_refuser(mysqli $conn, int $demande_id, string $motif): bool
+{
+    $stmt = $conn->prepare("SELECT a.*, u.email, u.nom FROM abonnements a JOIN users u ON u.id = a.user_id WHERE a.id = ? AND a.statut = 'en_attente'");
+    $stmt->bind_param("i", $demande_id);
+    $stmt->execute();
+    $d = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    if (!$d) return false;
+
+    $motif = mb_substr(trim($motif), 0, 255) ?: 'Paiement introuvable';
+    $stmt = $conn->prepare("UPDATE abonnements SET statut = 'refuse', motif_refus = ?, traite_le = NOW() WHERE id = ?");
+    $stmt->bind_param("si", $motif, $demande_id);
+    $stmt->execute();
+    $stmt->close();
+
+    email_envoyer($d['email'], 'Ta demande d\'abonnement - SafeGP', email_gabarit(
+        'Demande d\'abonnement non validée',
+        '<p>Bonjour ' . htmlspecialchars($d['nom']) . ',</p><p>Nous n\'avons pas pu valider ton paiement (référence '
+        . htmlspecialchars($d['reference']) . ').</p><p><strong>Motif :</strong> ' . htmlspecialchars($motif)
+        . '</p><p>Vérifie la référence et refais une demande, ou contacte-nous depuis « Donner mon avis ».</p>',
+        'Voir les formules',
+        url_site() . '/tarifs.php'
+    ));
+    return true;
 }
 
 // ============================================================
@@ -529,4 +647,24 @@ function message_envoyer(mysqli $conn, int $moi, string $moi_nom, int $destinata
         email_envoyer($destinataire['email'], 'Nouveau message de ' . $moi_nom . ' - SafeGP', $html);
     }
     return $id;
+}
+
+// Page réservée aux membres connectés : sinon, connexion puis retour ici
+function exiger_connexion(): void
+{
+    if (isset($_SESSION['user_id'])) return;
+    $page = basename($_SERVER['SCRIPT_NAME'] ?? 'index.php');
+    $suite = $page . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SERVER['QUERY_STRING'] : '');
+    header("Location: connexion.php?suite=" . urlencode($suite));
+    exit();
+}
+
+// Photo de profil si le fichier existe vraiment, sinon l'initiale du nom
+// (évite les images cassées quand un fichier a disparu du dossier uploads)
+function avatar(?string $nom, ?string $photo, string $classe = ''): string
+{
+    if (!empty($photo) && preg_match('/^[\w.-]+$/', $photo) && is_file(__DIR__ . '/uploads/' . $photo)) {
+        return '<img src="uploads/' . e($photo) . '?v=' . filemtime(__DIR__ . '/uploads/' . $photo) . '" alt="" class="' . e($classe) . '">';
+    }
+    return e(strtoupper(mb_substr((string)$nom, 0, 1)) ?: '?');
 }

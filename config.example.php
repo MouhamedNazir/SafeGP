@@ -35,3 +35,9 @@ define('SMTP_UTILISATEUR', '');          // ex : 'ton.adresse@gmail.com'
 define('SMTP_MOT_DE_PASSE', '');         // mot de passe d'application, pas ton vrai mot de passe
 define('EMAIL_EXPEDITEUR', '');          // adresse d'envoi (souvent la même que SMTP_UTILISATEUR)
 define('EMAIL_NOM', 'SafeGP');
+
+// ---------- Paiement des abonnements (mobile money) ----------
+// Numéros sur lesquels les membres paient ; laisser vide pour masquer un moyen
+define('PAIEMENT_WAVE', '');             // ex : '+221 77 000 00 00'
+define('PAIEMENT_ORANGE_MONEY', '');     // ex : '+221 77 000 00 00'
+define('PAIEMENT_TITULAIRE', '');        // nom affiché du titulaire des comptes

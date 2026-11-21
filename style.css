@@ -1773,6 +1773,7 @@ h3 .badge-nonlu {
    ADMIN
    ============================================================ */
 .stat-card {
+    flex: 1 1 170px;
     background-color: var(--surface);
     border: 1px solid var(--bordure);
     padding: 22px 30px;
@@ -1927,10 +1928,353 @@ footer {
 }
 
 /* ============================================================
+   TARIFS ET ABONNEMENTS
+   ============================================================ */
+.tarifs {
+    padding: 50px 20px 0;
+    text-align: center;
+}
+.tarifs h2 {
+    font-size: clamp(26px, 4vw, 36px);
+    margin: 0 0 10px;
+}
+.tarifs-intro {
+    color: var(--texte-doux);
+    max-width: 640px;
+    margin: 0 auto 26px;
+}
+.bascule-duree {
+    display: inline-flex;
+    gap: 4px;
+    padding: 4px;
+    background: var(--surface);
+    border: 1px solid var(--bordure);
+    border-radius: 999px;
+    margin-bottom: 20px;
+}
+.bascule-duree a {
+    padding: 9px 20px;
+    border-radius: 999px;
+    color: var(--texte);
+    text-decoration: none;
+    font-weight: 500;
+    font-size: 15px;
+}
+.bascule-duree a.actif {
+    background: var(--orange);
+    color: #fff;
+}
+.badge-offre {
+    background: var(--vert);
+    color: #fff;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    margin-left: 4px;
+    vertical-align: middle;
+}
+.tarifs-actuel {
+    color: var(--texte-doux);
+    font-size: 14px;
+    margin: 0 0 20px;
+}
+.grille-tarifs {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 20px;
+    margin-top: 16px;
+    text-align: left;
+    align-items: stretch;
+}
+.carte-tarif {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    padding: 28px 24px;
+    background: var(--surface);
+    border: 1px solid var(--bordure);
+    border-radius: 20px;
+    box-shadow: var(--ombre-legere);
+}
+.carte-tarif-vedette {
+    border: 2px solid var(--orange);
+    box-shadow: 0 16px 40px rgba(249, 115, 22, 0.18);
+}
+.ruban {
+    position: absolute;
+    top: -13px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--orange);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 4px 14px;
+    border-radius: 999px;
+    white-space: nowrap;
+}
+.carte-tarif h3 {
+    margin: 0 0 12px;
+    font-size: 20px;
+}
+.tarif-prix strong {
+    font-size: 32px;
+    font-weight: 700;
+}
+.tarif-prix span {
+    color: var(--texte-doux);
+}
+.tarif-equivalent {
+    color: var(--texte-doux);
+    font-size: 13px;
+    min-height: 40px;
+    margin: 6px 0 16px;
+}
+.tarif-avantages {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    flex: 1;
+}
+.tarif-avantages i {
+    color: var(--vert-texte);
+    width: 18px;
+}
+.btn-large {
+    justify-content: center;
+    width: 100%;
+    padding: 12px;
+    font-size: 15px;
+}
+.tarif-inclus {
+    text-align: center;
+    color: var(--texte-doux);
+    padding: 12px;
+    border: 1px dashed var(--bordure);
+    border-radius: 10px;
+}
+.tarifs-faq {
+    max-width: 720px;
+    margin: 50px auto 0;
+    text-align: left;
+}
+.tarifs-faq details,
+.bloc-repliable,
+.trajets-passes {
+    background: var(--surface);
+    border: 1px solid var(--bordure);
+    border-radius: 12px;
+    padding: 14px 18px;
+    margin-bottom: 10px;
+}
+.tarifs-faq summary,
+.bloc-repliable summary,
+.trajets-passes summary {
+    cursor: pointer;
+    font-weight: 600;
+}
+.tarifs-faq p {
+    color: var(--texte-doux);
+    margin: 10px 0 0;
+}
+.bloc-repliable form {
+    margin-top: 16px;
+}
+.trajets-passes {
+    margin-top: 20px;
+}
+.trajets-passes .annonce {
+    opacity: 0.75;
+    margin-top: 14px;
+}
+
+/* Page d'abonnement */
+.recap-paiement {
+    background: var(--surface);
+    border: 1px solid var(--bordure);
+    border-radius: 14px;
+    padding: 18px 20px;
+    margin-bottom: 20px;
+}
+.recap-paiement p {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin: 6px 0;
+}
+.recap-paiement p span {
+    color: var(--texte-doux);
+}
+.recap-total {
+    border-top: 1px dashed var(--bordure);
+    padding-top: 10px;
+    font-size: 18px;
+}
+.recap-total strong {
+    color: var(--orange-texte);
+    font-size: 22px;
+}
+.recap-paiement .tarif-equivalent {
+    justify-content: flex-end;
+    min-height: 0;
+}
+.moyens-paiement {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px;
+    margin-bottom: 10px;
+}
+.moyen-paiement {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 16px;
+    border-radius: 14px;
+    border: 1px solid var(--bordure);
+    background: var(--surface);
+}
+.moyen-wave { border-left: 4px solid #1dc8f2; }
+.moyen-orange_money { border-left: 4px solid #ff7900; }
+.numero-paiement {
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+}
+.moyen-paiement .btn-lien {
+    align-self: flex-start;
+    padding-left: 0;
+    color: var(--orange-texte);
+}
+
+/* Compteur de publications */
+.quota-ligne {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+.quota-barre {
+    height: 6px;
+    background: var(--surface-2);
+    border-radius: 999px;
+    overflow: hidden;
+    margin: 10px 0 4px;
+}
+.quota-barre span {
+    display: block;
+    height: 100%;
+    background: var(--orange);
+    border-radius: 999px;
+}
+.quota-atteint .quota-barre span {
+    background: var(--rouge-texte);
+}
+.quota p {
+    margin: 8px 0 0;
+    font-size: 13px;
+}
+.quota a {
+    color: var(--orange-texte);
+}
+.quota-premium {
+    color: var(--texte);
+}
+.quota-premium i {
+    color: var(--jaune-texte);
+}
+
+/* Profil, admin : petits éléments */
+.titre-section,
+.titre-admin {
+    color: var(--orange-texte);
+    margin: 40px 0 16px;
+}
+.texte-doux-bloc {
+    color: var(--texte-doux);
+}
+small.texte-doux-bloc {
+    display: block;
+}
+.form-formule {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin: 0;
+}
+.form-formule input[type="date"] {
+    width: 140px;
+}
+.ligne-attente {
+    background: var(--orange-voile);
+}
+.btn-petit {
+    padding: 6px 12px;
+    font-size: 13px;
+}
+.refus summary {
+    cursor: pointer;
+    color: var(--rouge-texte);
+    font-size: 13px;
+    margin-top: 6px;
+}
+.refus form {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 6px;
+}
+.statut-ok { color: var(--vert-texte); font-weight: 600; }
+.statut-refus { color: var(--rouge-texte); font-weight: 600; }
+.statut-attente { color: var(--orange-texte); font-weight: 600; }
+.lien-signaler {
+    margin-left: auto;
+    color: var(--texte-doux);
+    font-size: 13px;
+    text-decoration: none;
+}
+.lien-signaler:hover {
+    color: var(--rouge-texte);
+}
+
+/* Avatars : la photo remplit toujours le rond */
+.avatar-mini img,
+.profil-avatar img,
+.gp-card-avatar img,
+.conv-avatar img {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover;
+    border-radius: 50%;
+}
+.avatar-mini {
+    overflow: hidden;
+}
+
+/* Pages de texte (conditions) */
+.page-texte {
+    max-width: 800px;
+    margin: 50px auto;
+    padding: 0 20px;
+}
+.page-texte h3 {
+    color: var(--orange-texte);
+    margin-top: 30px;
+}
+.page-texte li {
+    margin-bottom: 8px;
+}
+
+/* ============================================================
    RESPONSIVE (tablettes et téléphones)
    ============================================================ */
 /* Menu ☰ : dès que les liens ne tiennent plus sur une ligne */
-@media (max-width: 1080px) {
+@media (max-width: 1200px) {
     body {
         padding-top: 66px;
     }

@@ -2,10 +2,7 @@
 require_once 'init.php';
 
 // Seuls les connectés peuvent accéder au dashboard
-if (!isset($_SESSION['user_id'])) {
-    header("Location: connexion.php");
-    exit();
-}
+exiger_connexion();
 
 $user_id = $_SESSION['user_id'];
 
@@ -68,15 +65,10 @@ $conn->close();
             </p>
         <?php endif; ?>
 
-        <a href="publier.php" class="btn-contact" style="display:inline-block; margin-bottom:15px;">
+        <a href="publier.php" class="btn-contact" style="margin-bottom:15px;">
             + Publier un nouveau trajet
         </a>
-        <?php if ($quota['illimite']): ?>
-            <p class="quota quota-premium"><i class="fa-solid fa-crown"></i> Compte premium : publications illimitées</p>
-        <?php else: ?>
-            <p class="quota <?= $quota['restantes'] <= 0 ? 'quota-atteint' : '' ?>"><i class="fa-solid fa-gauge"></i>
-                Compte gratuit : <?= $quota['utilisees'] ?> / <?= FREEMIUM_LIMITE_MOIS ?> publications ce mois-ci</p>
-        <?php endif; ?>
+        <?php include 'quota_bandeau.php'; ?>
 
         <?php if ($trajets): ?>
 

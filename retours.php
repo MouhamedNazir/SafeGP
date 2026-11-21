@@ -11,6 +11,8 @@ $connecte = isset($_SESSION['user_id']);
 $success = false;
 $erreur = "";
 $type = $_GET['type'] ?? 'suggestion';
+// Signalement d'une annonce : le message est pré-rempli avec sa référence
+$trajet_signale = (int)($_GET['trajet'] ?? 0);
 if (!isset($types[$type])) $type = 'suggestion';
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
@@ -103,7 +105,7 @@ $conn->close();
                 <div class="form-group">
                     <label>Ton message</label>
                     <textarea name="message" required maxlength="3000" style="height:160px;"
-                              placeholder="Ex : Ce serait pratique de pouvoir filtrer les trajets par date..."><?= e($_POST['message'] ?? '') ?></textarea>
+                              placeholder="Ex : Ce serait pratique de pouvoir filtrer les trajets par date..."><?= e($_POST['message'] ?? ($trajet_signale ? "Je signale l'annonce n°" . $trajet_signale . " (profil.php#trajet-" . $trajet_signale . ") car : " : '')) ?></textarea>
                 </div>
 
                 <?php if (!$connecte): ?>

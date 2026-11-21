@@ -1,10 +1,7 @@
 <?php
 require_once 'init.php';
 
-if (!isset($_SESSION['user_id'])) {
-    header("Location: connexion.php");
-    exit();
-}
+exiger_connexion();
 
 $user_id = (int)$_SESSION['user_id'];
 $success = isset($_GET['publie']);
@@ -12,7 +9,7 @@ $erreur = "";
 $t = [];
 $contacts_valeurs = [];
 
-// Limite freemium : 5 publications par mois pour un compte gratuit
+// Limite de publications selon la formule (Gratuit 4 / Standard 8 / Illimité)
 $quota = quota_publication($conn, $user_id);
 $limite_atteinte = !$quota['illimite'] && $quota['restantes'] <= 0;
 
@@ -26,7 +23,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     if ($email_a_confirmer) {
         $erreur = "Confirme d'abord ton adresse e-mail pour publier un trajet.";
     } elseif ($limite_atteinte) {
-        $erreur = "Tu as atteint la limite de " . FREEMIUM_LIMITE_MOIS . " publications ce mois-ci avec le compte gratuit.";
+        $erreur = "Tu as atteint la limite de " . $quota['limite'] . " publications ce mois-ci avec la formule " . $quota['nom'] . ".";
     } elseif (!$erreur) {
         $erreur = trajet_valider($t, $contacts_valeurs);
     }
@@ -86,19 +83,8 @@ $conn->close();
             <p class="erreur"><i class="fa-solid fa-circle-xmark" style="color:white;"></i> <?= e($erreur) ?></p>
         <?php endif; ?>
 
-        <!-- Compteur freemium -->
-        <?php if ($quota['illimite']): ?>
-            <p class="quota quota-premium"><i class="fa-solid fa-crown"></i> Compte premium : publications illimitées</p>
-        <?php else: ?>
-            <p class="quota <?= $limite_atteinte ? 'quota-atteint' : '' ?>">
-                <i class="fa-solid fa-gauge"></i>
-                Compte gratuit : <?= $quota['utilisees'] ?> / <?= FREEMIUM_LIMITE_MOIS ?> publications ce mois-ci
-                <?php if ($limite_atteinte): ?>
-                    <br>Tu pourras publier à nouveau le <?= date('d/m/Y', strtotime('first day of next month')) ?>.
-                    Pour publier sans limite, passe au premium : <a href="retours.php?type=autre">contacte-nous</a>.
-                <?php endif; ?>
-            </p>
-        <?php endif; ?>
+        <!-- Formule et publications du mois -->
+        <?php include 'quota_bandeau.php'; ?>
 
         <?php if ($email_a_confirmer): ?>
             <p class="quota quota-atteint"><i class="fa-solid fa-envelope"></i> Confirme ton adresse e-mail (lien reçu à l'inscription) pour pouvoir publier. Tu peux renvoyer l'e-mail depuis le bandeau en haut de la page.</p>

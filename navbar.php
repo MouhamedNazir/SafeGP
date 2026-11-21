@@ -26,18 +26,14 @@
         <li><a href="search_trajet.php">Rechercher</a></li>
         <li><a href="membres.php"><i class="fa-solid fa-users"></i> Membres</a></li>
         <li><a href="publier.php">Publier</a></li>
+        <li><a href="tarifs.php"><i class="fa-solid fa-crown"></i> Tarifs</a></li>
         <li><a href="messagerie.php"><i class="fa-solid fa-message"></i> Messages<?php if (!empty($nav_messages_non_lus)): ?><span class="badge-nonlu" title="Messages non lus"><?= (int)$nav_messages_non_lus ?></span><?php endif; ?></a></li>
 
         <?php if (isset($_SESSION['user_id'])): ?>
 
             <li class="dropdown">
                 <span class="user-nom">
-                    <?php if (!empty($_SESSION['user_photo'])): ?>
-                        <img src="uploads/<?= htmlspecialchars($_SESSION['user_photo']) ?>" 
-                             style="width:35px; height:35px; border-radius:50%; object-fit:cover; vertical-align:middle;">
-                    <?php else: ?>
-                        <span class="avatar-mini"><?= strtoupper(substr($_SESSION['user_nom'], 0, 1)) ?></span>
-                    <?php endif; ?>
+                    <span class="avatar-mini"><?= avatar($_SESSION['user_nom'] ?? '', $_SESSION['user_photo'] ?? null) ?></span>
                     <?= htmlspecialchars($_SESSION['user_nom']) ?>
                     <i class="fa-solid fa-chevron-down" style="font-size:11px;"></i>
                 </span>
@@ -48,7 +44,7 @@
                     <li class="separateur" role="separator"></li>
                     <?php if (!empty($nav_is_admin)): ?>
                         <li><a href="admin.php"><i class="fa-solid fa-shield"></i> Admin
-                            <?php if (!empty($nav_retours_non_lus)): ?><span class="badge-nonlu" title="Retours clients non lus"><?= (int)$nav_retours_non_lus ?></span><?php endif; ?>
+                            <?php if (!empty($nav_retours_non_lus)): ?><span class="badge-nonlu" title="Retours non lus et paiements à vérifier"><?= (int)$nav_retours_non_lus ?></span><?php endif; ?>
                         </a></li>
                     <?php endif; ?>
                     <li><a href="retours.php"><i class="fa-solid fa-lightbulb"></i> Donner mon avis</a></li>
@@ -107,6 +103,13 @@
         <?= csrf_field() ?>
         <button type="submit" class="btn-lien">Renvoyer l'e-mail</button>
     </form>
+</div>
+<?php endif; ?>
+<?php if (!empty($nav_abonnement_fin)): ?>
+<div class="bandeau-info">
+    <i class="fa-solid fa-crown"></i>
+    Ton abonnement se termine le <?= date('d/m/Y', strtotime($nav_abonnement_fin)) ?>.
+    <a href="tarifs.php">Le renouveler</a>
 </div>
 <?php endif; ?>
 <?php if (isset($_GET['confirmation'])): ?>

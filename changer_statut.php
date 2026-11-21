@@ -1,10 +1,7 @@
 <?php
 require_once 'init.php'; // session + jeton CSRF vérifié
 
-if (!isset($_SESSION['user_id'])) {
-    header("Location: connexion.php");
-    exit();
-}
+exiger_connexion();
 
 // Uniquement en POST, avec un jeton CSRF valide
 if ($_SERVER["REQUEST_METHOD"] !== "POST") {

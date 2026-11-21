@@ -59,13 +59,7 @@ $og_description = "Voir les trajets de " . $user['nom'] . " et lui confier vos c
             <?php endif; ?>
 
             <div class="profil-avatar">
-                <?php if (!empty($user['photo'])): ?>
-                    <img src="uploads/<?= e($user['photo']) ?>"
-                         alt="photo"
-                         style="width:70px; height:70px; border-radius:50%; object-fit:cover;">
-                <?php else: ?>
-                    <?= e(strtoupper(mb_substr($user['nom'], 0, 1))) ?>
-                <?php endif; ?>
+                <?= avatar($user['nom'], $user['photo']) ?>
             </div>
             <div>
                 <h2><?= e($user['nom']) ?></h2>
@@ -88,10 +82,20 @@ $og_description = "Voir les trajets de " . $user['nom'] . " et lui confier vos c
             </div>
         <?php endif; ?>
 
-        <h3>Trajets</h3>
+        <?php
+            // Trajets à venir d'abord, puis les trajets passés (repliés)
+            $a_venir = array_filter($trajets, fn($t) => $t['date_arrivee'] >= date('Y-m-d'));
+            $passes = array_filter($trajets, fn($t) => $t['date_arrivee'] < date('Y-m-d'));
+        ?>
+        <h3>Trajets à venir (<?= count($a_venir) ?>)</h3>
 
         <?php if ($trajets): ?>
-            <?php foreach ($trajets as $row): ?>
+            <?php if (!$a_venir): ?><p class="texte-doux-bloc">Aucun trajet à venir pour l'instant.</p><?php endif; ?>
+            <?php foreach (array_merge($a_venir, $passes) as $i => $row): ?>
+                <?php if ($passes && $i === count($a_venir)): ?>
+                    <details class="trajets-passes" <?= isset($_GET['passes']) ? 'open' : '' ?>>
+                    <summary>Trajets passés (<?= count($passes) ?>)</summary>
+                <?php endif; ?>
                 <div class="annonce" id="trajet-<?= (int)$row['id'] ?>">
                     <?php $avec_gp = false; include 'trajet_infos.php'; ?>
 
@@ -112,6 +116,7 @@ $og_description = "Voir les trajets de " . $user['nom'] . " et lui confier vos c
                     </div>
                 </div>
             <?php endforeach; ?>
+            <?php if ($passes): ?></details><?php endif; ?>
 
         <?php else: ?>
             <p>Ce GP n'a pas encore publié de trajet.</p>

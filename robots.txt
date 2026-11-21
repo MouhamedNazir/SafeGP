@@ -1,0 +1,12 @@
+# Pages privées : inutile de les indexer dans les moteurs de recherche
+User-agent: *
+Disallow: /admin.php
+Disallow: /messagerie.php
+Disallow: /messages_api.php
+Disallow: /mon_profil.php
+Disallow: /dashboard.php
+Disallow: /abonnement.php
+Disallow: /reinitialiser.php
+Disallow: /verifier_email.php
+Disallow: /confirmer_email.php
+Disallow: /logs/

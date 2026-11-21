@@ -21,6 +21,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     } elseif (strlen($mot_de_passe) < 8) {
         $erreur = "Le mot de passe doit faire au moins 8 caractères.";
 
+    } elseif (empty($_POST['cgu'])) {
+        $erreur = "Merci d'accepter les conditions d'utilisation.";
+
     } elseif ($mot_de_passe !== $confirmation) {
         $erreur = "Les mots de passe ne correspondent pas.";
 
@@ -136,6 +139,11 @@ $conn->close();
                 <input type="password" name="confirmation" 
                     placeholder="Répète ton mot de passe" required>
             </div>
+
+            <label class="case-a-cocher">
+                <input type="checkbox" name="cgu" value="1" required <?= !empty($_POST['cgu']) ? 'checked' : '' ?>>
+                <span>J'accepte les <a href="conditions.php" target="_blank">conditions d'utilisation</a></span>
+            </label>
 
             <button type="submit" class="btn-publier">Créer mon compte</button>
 

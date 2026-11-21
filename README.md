@@ -21,10 +21,11 @@ Plateforme web de mise en relation entre **GP** (voyageurs/transporteurs) et **e
 - Disponibilités : kilos restants, date limite de dépôt, heures de départ/arrivée, horaires de dépôt et de réception, GP disponible ou non, horaires où il est joignable
 - Plusieurs numéros WhatsApp par profil, chacun avec le nom de son propriétaire, et trajets publiés pour un autre voyageur avec ses propres numéros
 - Recherche de membres par nom ou @nom d'utilisateur
-- Formule gratuite limitée à 5 publications par mois, comptes premium illimités (activés depuis l'admin)
+- Formules : Gratuit (4 trajets/mois), Standard (8 trajets, 500 FCFA/mois ou 5 000 FCFA/an), Illimité (750 FCFA/mois ou 7 500 FCFA/an), avec équivalents en €, $ et DH
+- Paiement par Wave / Orange Money : le membre saisit la référence, l'admin vérifie et valide ; rappel avant expiration, retour automatique en Gratuit
 - Retours clients (suggestions, problèmes) consultables dans le panel admin
 - Aperçu avec logo quand on partage un lien (WhatsApp, Facebook...)
-- Confirmation de l'adresse e-mail, mot de passe oublié, suppression de son compte
+- Confirmation de l'adresse e-mail, mot de passe oublié, changement de mot de passe et d'e-mail, suppression de son compte
 - Notifications : badge des messages non lus, e-mail à la réception d'un message, e-mail aux admins pour chaque retour client
 - Prix au kilo en dirham, euro, dollar ou franc CFA
 - Ouvert au monde entier : pays de départ et d'arrivée avec drapeaux, 8 devises (DH, €, $, FCFA, £, $ CA, CHF)
@@ -32,7 +33,8 @@ Plateforme web de mise en relation entre **GP** (voyageurs/transporteurs) et **e
 - Messagerie en direct : messages sans rechargement, « Vu », séparateurs de jours, recherche de conversations, bouton « Contacter pour ce trajet »
 - Thème clair et sombre (bouton ☀/☾, suit le réglage de l'appareil)
 - Site adapté au mobile (menu ☰, messagerie, tableaux admin)
-- Sécurité : mots de passe bcrypt, requêtes préparées, jetons CSRF, cookies de session sécurisés, HTTPS forcé (optionnel), erreurs masquées en ligne
+- Sécurité : mots de passe bcrypt, requêtes préparées, jetons CSRF, cookies de session sécurisés, HTTPS forcé (optionnel), erreurs masquées en ligne, blocage après 5 essais de connexion, en-têtes de sécurité, aucun script exécutable dans uploads/
+- Conditions d'utilisation, signalement d'annonces
 
 ##  Aperçu
 

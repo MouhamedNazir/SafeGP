@@ -1,0 +1,11 @@
+# Les photos des membres ne doivent jamais être exécutées comme du code :
+# même si un fichier malveillant arrivait ici, il ne pourrait pas s'exécuter.
+<FilesMatch "\.(php\d?|phtml|phar|pl|py|cgi|sh|html?|svg|js)$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
+</FilesMatch>

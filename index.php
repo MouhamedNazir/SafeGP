@@ -158,11 +158,7 @@ $conn->close();
             <?php foreach ($gps as $gp): ?>
             <a href="profil.php?id=<?= (int)$gp['id'] ?>" class="gp-card">
                 <div class="gp-card-avatar">
-                    <?php if (!empty($gp['photo'])): ?>
-                        <img src="uploads/<?= e($gp['photo']) ?>" alt="">
-                    <?php else: ?>
-                        <?= e(strtoupper(mb_substr($gp['nom'], 0, 1))) ?>
-                    <?php endif; ?>
+                    <?= avatar($gp['nom'], $gp['photo']) ?>
                 </div>
                 <div class="gp-card-info">
                     <h4><?= e($gp['nom']) ?></h4>

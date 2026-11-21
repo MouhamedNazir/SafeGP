@@ -34,12 +34,7 @@ $depot_cloture = !empty($row['date_limite_depot']) && $row['date_limite_depot'] 
 
 <?php if (!empty($avec_gp) && !empty($row['nom'])): ?>
 <div class="gp-nom">
-    <?php if (!empty($row['photo'])): ?>
-        <img src="uploads/<?= e($row['photo']) ?>" alt=""
-             style="width:40px; height:40px; border-radius:50%; object-fit:cover; vertical-align:middle;">
-    <?php else: ?>
-        <span class="avatar-mini"><?= e(strtoupper(mb_substr($row['nom'], 0, 1))) ?></span>
-    <?php endif; ?>
+    <span class="avatar-mini"><?= avatar($row['nom'], $row['photo']) ?></span>
     <a href="profil.php?id=<?= (int)$row['user_id'] ?>">@<?= e($row['username'] ?? $row['nom']) ?></a>
     <?= badge_dispo_gp($row['disponible'] ?? 1) ?>
 </div>

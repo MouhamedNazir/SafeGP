@@ -13,6 +13,20 @@ require_once __DIR__ . '/config.php';    // $conn
 forcer_https_si_demande();
 $conn->set_charset('utf8mb4');
 
+// Un seul fuseau horaire pour PHP et MySQL (UTC, comme Dakar) :
+// les dates enregistrées et affichées restent cohérentes
+date_default_timezone_set('Africa/Dakar');
+$conn->query("SET time_zone = '+00:00'");
+
+// En-têtes de sécurité : pas d'intégration du site dans une autre page
+// (anti-clickjacking), pas de devinette du type de fichier, référent limité
+if (!headers_sent()) {
+    header('X-Frame-Options: SAMEORIGIN');
+    header('X-Content-Type-Options: nosniff');
+    header('Referrer-Policy: strict-origin-when-cross-origin');
+    header('Permissions-Policy: camera=(), microphone=(), geolocation=()');
+}
+
 require_once __DIR__ . '/csrf.php';      // démarre la session (cookie sécurisé)
 require_once __DIR__ . '/pays.php';
 require_once __DIR__ . '/fonctions.php';
@@ -23,10 +37,11 @@ csrf_verify(); // bloque tout POST sans jeton CSRF valide
 // (pas seulement en session) tant que la connexion est ouverte
 $nav_is_admin = false;
 $nav_messages_non_lus = 0;
+$nav_abonnement_fin = null;
 $nav_email_a_confirmer = false;
 if (isset($_SESSION['user_id'])) {
     $check_admin = $conn->prepare("
-        SELECT role, email_verifie,
+        SELECT id, nom, email, role, email_verifie, formule, abonnement_fin, rappel_abonnement,
                (SELECT COUNT(*) FROM messages WHERE destinataire_id = users.id AND lu = 0) AS non_lus
         FROM users WHERE id = ?");
     $check_admin->bind_param("i", $_SESSION['user_id']);
@@ -41,11 +56,32 @@ if (isset($_SESSION['user_id'])) {
         $nav_is_admin = $check_role['role'] === 'admin';
         $nav_messages_non_lus = (int)$check_role['non_lus'];
         $nav_email_a_confirmer = !$check_role['email_verifie'] && email_actif();
+
+        // Abonnement qui se termine dans 3 jours ou moins : bandeau + e-mail (une fois)
+        $fin = $check_role['abonnement_fin'];
+        if ($check_role['formule'] !== 'gratuit' && $fin && $fin >= date('Y-m-d') && $fin <= date('Y-m-d', strtotime('+3 days'))) {
+            $nav_abonnement_fin = $fin;
+            if ($check_role['rappel_abonnement'] !== $fin) {
+                $maj = $conn->prepare("UPDATE users SET rappel_abonnement = ? WHERE id = ?");
+                $maj->bind_param("si", $fin, $check_role['id']);
+                $maj->execute();
+                $maj->close();
+                email_envoyer($check_role['email'], 'Ton abonnement se termine bientôt - SafeGP', email_gabarit(
+                    'Ton abonnement se termine le ' . date('d/m/Y', strtotime($fin)),
+                    '<p>Bonjour ' . htmlspecialchars($check_role['nom']) . ',</p><p>Ta formule <strong>'
+                    . htmlspecialchars(FORMULES[$check_role['formule']]['nom'] ?? '') . '</strong> se termine le <strong>'
+                    . date('d/m/Y', strtotime($fin)) . '</strong>. Ensuite, ton compte repassera en formule Gratuite (4 publications par mois).</p>',
+                    'Renouveler mon abonnement',
+                    url_site() . '/tarifs.php'
+                ));
+            }
+        }
     }
 }
 
-// Pour l'admin : nombre de retours clients non lus (badge dans la navbar)
+// Pour l'admin : retours clients non lus + paiements à vérifier (badge dans la navbar)
 $nav_retours_non_lus = 0;
 if ($nav_is_admin) {
-    $nav_retours_non_lus = (int)$conn->query("SELECT COUNT(*) FROM retours WHERE lu = 0")->fetch_row()[0];
+    $nav_retours_non_lus = (int)$conn->query("SELECT COUNT(*) FROM retours WHERE lu = 0")->fetch_row()[0]
+        + (int)$conn->query("SELECT COUNT(*) FROM abonnements WHERE statut = 'en_attente'")->fetch_row()[0];
 }

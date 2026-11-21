@@ -198,4 +198,27 @@ document.addEventListener('DOMContentLoaded', function () {
         setInterval(function () { if (!document.hidden) actualiser(); }, 4000);
         document.addEventListener('visibilitychange', function () { if (!document.hidden) actualiser(); });
     }
+
+    // ---------- Abonnement : copier le numéro de paiement ----------
+    document.querySelectorAll('[data-copier]').forEach(function (bouton) {
+        bouton.addEventListener('click', async function () {
+            try {
+                await navigator.clipboard.writeText(bouton.dataset.copier);
+                const texte = bouton.innerHTML;
+                bouton.innerHTML = '<i class="fa-solid fa-check"></i> Copié';
+                setTimeout(function () { bouton.innerHTML = texte; }, 1500);
+            } catch (e) { /* presse-papiers indisponible : le numéro reste affiché */ }
+        });
+    });
+
+    // ---------- Lien vers un trajet (#trajet-12) caché dans « Trajets passés » ----------
+    if (location.hash) {
+        const cible = document.getElementById(location.hash.slice(1));
+        const repli = cible && cible.closest('details');
+        if (repli) {
+            repli.open = true;
+            cible.scrollIntoView({block: 'start'});
+        }
+    }
 });
+

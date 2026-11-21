@@ -2,10 +2,7 @@
 require_once 'init.php';
 
 // Seuls les utilisateurs connectés peuvent accéder à cette page
-if (!isset($_SESSION['user_id'])) {
-    header("Location: connexion.php");
-    exit();
-}
+exiger_connexion();
 
 $user_id = $_SESSION['user_id'];
 $success = "";
@@ -104,6 +101,77 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['supprimer_compte'])) {
     }
 }
 
+// ============================================================
+// CHANGER DE MOT DE PASSE — l'ancien est demandé
+// ============================================================
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['changer_mdp'])) {
+    $actuel = $_POST['mdp_actuel'] ?? '';
+    $nouveau = $_POST['mdp_nouveau'] ?? '';
+    if (!password_verify($actuel, $user['mot_de_passe'])) {
+        $erreur = "Mot de passe actuel incorrect.";
+    } elseif (strlen($nouveau) < 8) {
+        $erreur = "Le nouveau mot de passe doit faire au moins 8 caractères.";
+    } elseif ($nouveau !== ($_POST['mdp_confirmation'] ?? '')) {
+        $erreur = "Les deux nouveaux mots de passe ne correspondent pas.";
+    } else {
+        $hash = password_hash($nouveau, PASSWORD_DEFAULT);
+        $stmt = $conn->prepare("UPDATE users SET mot_de_passe = ? WHERE id = ?");
+        $stmt->bind_param("si", $hash, $user_id);
+        $stmt->execute();
+        $stmt->close();
+        $user['mot_de_passe'] = $hash;
+        session_regenerate_id(true);
+        $success = "Mot de passe modifié !";
+    }
+}
+
+// ============================================================
+// CHANGER D'ADRESSE E-MAIL — confirmée par un lien envoyé à la
+// nouvelle adresse (l'ancienne reste active en attendant)
+// ============================================================
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['changer_email'])) {
+    $nouvel_email = trim($_POST['email_nouveau'] ?? '');
+    $check = $conn->prepare("SELECT id FROM users WHERE (email = ? OR email_nouveau = ?) AND id <> ?");
+    $check->bind_param("ssi", $nouvel_email, $nouvel_email, $user_id);
+    $check->execute();
+    $pris = (bool)$check->get_result()->fetch_row();
+    $check->close();
+
+    if (!password_verify($_POST['mdp_email'] ?? '', $user['mot_de_passe'])) {
+        $erreur = "Mot de passe incorrect.";
+    } elseif (!filter_var($nouvel_email, FILTER_VALIDATE_EMAIL)) {
+        $erreur = "Adresse e-mail invalide.";
+    } elseif (strcasecmp($nouvel_email, $user['email']) === 0) {
+        $erreur = "C'est déjà ton adresse actuelle.";
+    } elseif ($pris) {
+        $erreur = "Cette adresse est déjà utilisée par un autre compte.";
+    } elseif (!email_actif()) {
+        $erreur = "Le changement d'adresse n'est pas disponible tant que l'envoi d'e-mails n'est pas configuré.";
+    } else {
+        $stmt = $conn->prepare("UPDATE users SET email_nouveau = ? WHERE id = ?");
+        $stmt->bind_param("si", $nouvel_email, $user_id);
+        $stmt->execute();
+        $stmt->close();
+        $user['email_nouveau'] = $nouvel_email;
+        $jeton = jeton_creer($conn, $user_id, 'changement_email', 60 * 24);
+        email_envoyer($nouvel_email, 'Confirme ta nouvelle adresse - SafeGP', email_gabarit(
+            'Confirme ta nouvelle adresse e-mail',
+            '<p>Bonjour ' . htmlspecialchars($user['nom']) . ',</p><p>Clique sur le bouton pour utiliser cette adresse sur ton compte SafeGP. Le lien est valable 24 heures.</p>',
+            'Confirmer cette adresse',
+            url_site() . '/confirmer_email.php?jeton=' . $jeton
+        ));
+        $success = "Un lien de confirmation a été envoyé à " . $nouvel_email . ".";
+    }
+}
+
+// Abonnement : formule active + historique des demandes
+$quota = quota_publication($conn, $user_id);
+$stmt = $conn->prepare("SELECT * FROM abonnements WHERE user_id = ? ORDER BY id DESC LIMIT 10");
+$stmt->bind_param("i", $user_id);
+$stmt->execute();
+$historique_abonnements = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+$stmt->close();
+
 $contacts_valeurs = contacts_profil($conn, $user_id);
 
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['nom'])) {
@@ -201,15 +269,7 @@ $conn->close();
         <!-- Avatar + infos de base -->
         <div class="profil-header">
             <div class="profil-avatar">
-                <?php if (!empty($user['photo'])): ?>
-                    <!-- Si l'user a une photo → on l'affiche -->
-                    <img src="uploads/<?= htmlspecialchars($user['photo']) ?>" 
-                         alt="photo" 
-                         style="width:70px; height:70px; border-radius:50%; object-fit:cover;">
-                <?php else: ?>
-                    <!-- Sinon → on affiche la première lettre du nom -->
-                    <?= strtoupper(substr($user['nom'], 0, 1)) ?>
-                <?php endif; ?>
+                <?= avatar($user['nom'], $user['photo']) ?>
             </div>
             <div>
                 <h3><?= htmlspecialchars($user['nom']) ?></h3>
@@ -285,6 +345,76 @@ $conn->close();
             <button type="submit" class="btn-publier">Sauvegarder</button>
 
         </form>
+
+        <!-- MON ABONNEMENT -->
+        <h3 id="abonnement" class="titre-section">Mon abonnement</h3>
+        <?php include 'quota_bandeau.php'; ?>
+        <p><a href="tarifs.php" class="btn-contact"><i class="fa-solid fa-crown"></i> <?= $quota['formule'] === 'gratuit' ? 'Voir les formules' : 'Prolonger ou changer de formule' ?></a></p>
+        <?php if ($historique_abonnements): ?>
+            <div class="table-defilante">
+            <table class="admin-table">
+                <thead><tr><th>Date</th><th>Formule</th><th>Montant</th><th>Statut</th></tr></thead>
+                <tbody>
+                <?php foreach ($historique_abonnements as $h): ?>
+                    <tr>
+                        <td><?= date('d/m/Y', strtotime($h['created_at'])) ?></td>
+                        <td><?= e(FORMULES[$h['formule']]['nom']) ?> · <?= $h['duree'] === 'an' ? '1 an' : '1 mois' ?></td>
+                        <td><?= e(prix_fcfa((int)$h['montant'])) ?></td>
+                        <td>
+                            <?php if ($h['statut'] === 'en_attente'): ?><span class="statut-attente">En cours de vérification</span>
+                            <?php elseif ($h['statut'] === 'valide'): ?><span class="statut-ok">Validé</span> <small class="texte-doux-bloc">jusqu'au <?= date('d/m/Y', strtotime($h['date_fin'])) ?></small>
+                            <?php else: ?><span class="statut-refus">Refusé</span> <small class="texte-doux-bloc"><?= e($h['motif_refus']) ?></small><?php endif; ?>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+            </div>
+        <?php endif; ?>
+
+        <!-- SÉCURITÉ DU COMPTE -->
+        <h3 class="titre-section">Sécurité du compte</h3>
+        <details class="bloc-repliable">
+            <summary><i class="fa-solid fa-key"></i> Changer mon mot de passe</summary>
+            <form action="mon_profil.php" method="POST">
+                <?= csrf_field() ?>
+                <input type="hidden" name="changer_mdp" value="1">
+                <div class="form-group">
+                    <label>Mot de passe actuel</label>
+                    <input type="password" name="mdp_actuel" required autocomplete="current-password">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Nouveau mot de passe</label>
+                        <input type="password" name="mdp_nouveau" minlength="8" required autocomplete="new-password" placeholder="Au moins 8 caractères">
+                    </div>
+                    <div class="form-group">
+                        <label>Confirmer</label>
+                        <input type="password" name="mdp_confirmation" minlength="8" required autocomplete="new-password">
+                    </div>
+                </div>
+                <button type="submit" class="btn-publier">Changer le mot de passe</button>
+            </form>
+        </details>
+        <details class="bloc-repliable">
+            <summary><i class="fa-solid fa-envelope"></i> Changer mon adresse e-mail <small class="texte-doux-bloc">(actuelle : <?= e($user['email']) ?>)</small></summary>
+            <?php if (!empty($user['email_nouveau'])): ?>
+                <p class="aide-contact">En attente de confirmation : <strong><?= e($user['email_nouveau']) ?></strong> (clique sur le lien reçu à cette adresse).</p>
+            <?php endif; ?>
+            <form action="mon_profil.php" method="POST">
+                <?= csrf_field() ?>
+                <input type="hidden" name="changer_email" value="1">
+                <div class="form-group">
+                    <label>Nouvelle adresse e-mail</label>
+                    <input type="email" name="email_nouveau" required maxlength="150">
+                </div>
+                <div class="form-group">
+                    <label>Ton mot de passe</label>
+                    <input type="password" name="mdp_email" required autocomplete="current-password">
+                </div>
+                <button type="submit" class="btn-publier">Recevoir le lien de confirmation</button>
+            </form>
+        </details>
 
         <!-- Zone de danger : suppression définitive du compte -->
         <details class="zone-danger">

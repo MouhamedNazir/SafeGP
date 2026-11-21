@@ -3,10 +3,7 @@ require_once 'init.php';
 
 // Vérification — seuls les admins peuvent accéder
 // Si pas connecté ou pas admin → redirection
-if (!isset($_SESSION['user_id'])) {
-    header("Location: connexion.php");
-    exit();
-}
+exiger_connexion();
 
 // On vérifie le rôle dans la DB — pas seulement en session
 // car quelqu'un pourrait modifier sa session manuellement
@@ -71,15 +68,32 @@ if (isset($_POST['changer_role'])) {
     exit();
 }
 
-// Passer un utilisateur en premium (publications illimitées) ou en gratuit
-if (isset($_POST['changer_premium'])) {
+// Changer la formule d'un membre à la main (abonnement offert, correction...)
+// « fin » vide = sans date de fin
+if (isset($_POST['changer_formule'])) {
     $id = (int)$_POST['user_id'];
-    $premium = !empty($_POST['premium']) ? 1 : 0;
-    $stmt = $conn->prepare("UPDATE users SET premium = ? WHERE id = ?");
-    $stmt->bind_param("ii", $premium, $id);
-    $stmt->execute();
-    $stmt->close();
-    header("Location: admin.php?success=premium_modifie");
+    $formule = $_POST['formule'] ?? 'gratuit';
+    $fin = vide_en_null($_POST['fin'] ?? '');
+    if (isset(FORMULES[$formule]) && ($fin === null || strtotime($fin))) {
+        if ($formule === 'gratuit') $fin = null;
+        $stmt = $conn->prepare("UPDATE users SET formule = ?, abonnement_fin = ?, rappel_abonnement = NULL WHERE id = ?");
+        $stmt->bind_param("ssi", $formule, $fin, $id);
+        $stmt->execute();
+        $stmt->close();
+    }
+    header("Location: admin.php?success=formule_modifiee");
+    exit();
+}
+
+// Demandes d'abonnement : valider (après vérification du paiement) ou refuser
+if (isset($_POST['valider_abonnement'])) {
+    $ok = abonnement_valider($conn, (int)$_POST['valider_abonnement']);
+    header("Location: admin.php?success=" . ($ok ? 'abonnement_valide' : 'abonnement_deja_traite') . "#abonnements");
+    exit();
+}
+if (isset($_POST['refuser_abonnement'])) {
+    abonnement_refuser($conn, (int)$_POST['refuser_abonnement'], (string)($_POST['motif'] ?? ''));
+    header("Location: admin.php?success=abonnement_refuse#abonnements");
     exit();
 }
 
@@ -128,6 +142,16 @@ $users = $conn->query("
            (SELECT COUNT(*) FROM trajets WHERE trajets.user_id = users.id AND trajets.created_at >= '$debut_mois') AS publications_mois
     FROM users ORDER BY created_at DESC");
 
+// Demandes d'abonnement : en attente, puis les 15 dernières traitées
+$demandes = $conn->query("
+    SELECT a.*, u.nom, u.username, u.email
+    FROM abonnements a JOIN users u ON u.id = a.user_id
+    ORDER BY (a.statut = 'en_attente') DESC, a.id DESC
+    LIMIT 40")->fetch_all(MYSQLI_ASSOC);
+$demandes_en_attente = count(array_filter($demandes, fn($d) => $d['statut'] === 'en_attente'));
+$revenus_mois = (int)$conn->query("SELECT COALESCE(SUM(montant), 0) FROM abonnements WHERE statut = 'valide' AND traite_le >= '" . date('Y-m-01') . "'")->fetch_row()[0];
+$abonnes_actifs = (int)$conn->query("SELECT COUNT(*) FROM users WHERE formule <> 'gratuit' AND (abonnement_fin IS NULL OR abonnement_fin >= CURDATE())")->fetch_row()[0];
+
 // Retours clients, non lus d'abord
 $retours = $conn->query("
     SELECT retours.*, users.username
@@ -165,7 +189,10 @@ $conn->close();
                 if ($_GET['success'] == 'trajet_supprime') echo "Trajet supprimé !";
                 if ($_GET['success'] == 'user_supprime') echo "Utilisateur supprimé !";
                 if ($_GET['success'] == 'role_modifie') echo "Rôle modifié !";
-                if ($_GET['success'] == 'premium_modifie') echo "Abonnement modifié !";
+                if ($_GET['success'] == 'formule_modifiee') echo "Formule modifiée !";
+                if ($_GET['success'] == 'abonnement_valide') echo "Abonnement validé et activé, le membre a été prévenu par e-mail.";
+                if ($_GET['success'] == 'abonnement_refuse') echo "Demande refusée, le membre a été prévenu par e-mail.";
+                if ($_GET['success'] == 'abonnement_deja_traite') echo "Cette demande avait déjà été traitée.";
                 if ($_GET['success'] == 'retour_supprime') echo "Retour supprimé !";
             ?>
         </p>
@@ -191,6 +218,16 @@ $conn->close();
             <h3><?= $trajets_dispo ?></h3>
             <p>Trajets disponibles</p>
         </div>
+        <a href="#abonnements" class="stat-card" style="text-decoration:none; color:inherit;">
+            <i class="fa-solid fa-crown" style="font-size:30px; color:var(--jaune-texte);"></i>
+            <h3><?= $abonnes_actifs ?></h3>
+            <p>Abonnés actifs · <?= e(prix_fcfa($revenus_mois)) ?> ce mois</p>
+        </a>
+        <a href="#abonnements" class="stat-card" style="text-decoration:none; color:inherit;">
+            <i class="fa-solid fa-hourglass-half" style="font-size:30px; color:var(--orange);"></i>
+            <h3><?= $demandes_en_attente ?></h3>
+            <p>Paiements à vérifier</p>
+        </a>
         <a href="#retours" class="stat-card" style="text-decoration:none; color:inherit;">
             <i class="fa-solid fa-lightbulb" style="font-size:30px; color:#facc15;"></i>
             <h3><?= $retours_non_lus ?></h3>
@@ -238,20 +275,24 @@ $conn->close();
                     </form>
                 </td>
                 <td>
-                    <!-- Gratuit / premium -->
-                    <form action="admin.php" method="POST" style="display:inline;">
+                    <!-- Formule (modifiable à la main) -->
+                    <form action="admin.php" method="POST" class="form-formule">
                         <?= csrf_field() ?>
-                        <input type="hidden" name="changer_premium" value="1">
+                        <input type="hidden" name="changer_formule" value="1">
                         <input type="hidden" name="user_id" value="<?= (int)$user['id'] ?>">
-                        <select name="premium" onchange="this.form.submit()"
-                                class="select-petit">
-                            <option value="0" <?= !$user['premium'] ? 'selected' : '' ?>>gratuit</option>
-                            <option value="1" <?= $user['premium'] ? 'selected' : '' ?>>premium</option>
+                        <select name="formule" class="select-petit" aria-label="Formule">
+                            <?php foreach (FORMULES as $code => $f): ?>
+                                <option value="<?= $code ?>" <?= $user['formule'] === $code ? 'selected' : '' ?>><?= e($f['nom']) ?></option>
+                            <?php endforeach; ?>
                         </select>
+                        <input type="date" name="fin" class="select-petit" value="<?= e($user['abonnement_fin'] ?? '') ?>" title="Fin (vide = sans fin)" aria-label="Date de fin">
+                        <button type="submit" class="btn-lien" title="Enregistrer"><i class="fa-solid fa-floppy-disk"></i></button>
                     </form>
-                    <?php if (!$user['premium'] && $user['role'] != 'admin'): ?>
-                        <small style="color:var(--texte-doux); display:block;"><?= (int)$user['publications_mois'] ?>/<?= FREEMIUM_LIMITE_MOIS ?> ce mois</small>
-                    <?php endif; ?>
+                    <?php $fa = formule_active($user); $lim = FORMULES[$fa]['limite']; ?>
+                    <small class="texte-doux-bloc">
+                        <?php if ($user['formule'] !== 'gratuit' && $fa === 'gratuit'): ?>expiré · <?php endif; ?>
+                        <?= (int)$user['publications_mois'] ?>/<?= $lim === null ? '∞' : $lim ?> ce mois
+                    </small>
                 </td>
                 <td><?= date('d/m/Y', strtotime($user['created_at'])) ?></td>
                 <td>
@@ -328,6 +369,56 @@ $conn->close();
         </tbody>
     </table>
     </div>
+
+    <!-- ABONNEMENTS -->
+    <h3 id="abonnements" class="titre-admin">
+        <i class="fa-solid fa-crown"></i> Abonnements
+        <?php if ($demandes_en_attente): ?><span class="badge-nonlu"><?= $demandes_en_attente ?></span><?php endif; ?>
+    </h3>
+    <p class="aide-contact">Vérifie chaque paiement dans ton application Wave ou Orange Money (montant et référence) avant de valider.</p>
+
+    <?php if (!$demandes): ?>
+        <p class="texte-doux-bloc">Aucune demande d'abonnement pour l'instant.</p>
+    <?php else: ?>
+    <div class="table-defilante">
+    <table class="admin-table">
+        <thead>
+            <tr><th>Date</th><th>Membre</th><th>Formule</th><th>Montant</th><th>Paiement</th><th>Statut</th></tr>
+        </thead>
+        <tbody>
+        <?php foreach ($demandes as $d): ?>
+            <tr class="<?= $d['statut'] === 'en_attente' ? 'ligne-attente' : '' ?>">
+                <td><?= date('d/m/Y H:i', strtotime($d['created_at'])) ?></td>
+                <td><a href="profil.php?id=<?= (int)$d['user_id'] ?>">@<?= e($d['username'] ?? $d['nom']) ?></a><br><small class="texte-doux-bloc"><?= e($d['email']) ?></small></td>
+                <td><?= e(FORMULES[$d['formule']]['nom']) ?> · <?= $d['duree'] === 'an' ? '1 an' : '1 mois' ?></td>
+                <td><strong><?= e(prix_fcfa((int)$d['montant'])) ?></strong></td>
+                <td><?= e(MOYENS_PAIEMENT[$d['moyen']]) ?><br><code><?= e($d['reference']) ?></code><?php if ($d['telephone']): ?><br><small><?= e($d['telephone']) ?></small><?php endif; ?></td>
+                <td>
+                    <?php if ($d['statut'] === 'en_attente'): ?>
+                        <form action="admin.php" method="POST" class="form-inline" onsubmit="return confirm('Paiement vérifié ? L\'abonnement sera activé.')">
+                            <?= csrf_field() ?>
+                            <button type="submit" name="valider_abonnement" value="<?= (int)$d['id'] ?>" class="btn-contact btn-petit"><i class="fa-solid fa-check"></i> Valider</button>
+                        </form>
+                        <details class="refus">
+                            <summary>Refuser</summary>
+                            <form action="admin.php" method="POST">
+                                <?= csrf_field() ?>
+                                <input type="text" name="motif" class="select-petit" placeholder="Motif (ex : paiement introuvable)" maxlength="255">
+                                <button type="submit" name="refuser_abonnement" value="<?= (int)$d['id'] ?>" class="btn-contact btn-petit btn-supprimer">Refuser</button>
+                            </form>
+                        </details>
+                    <?php elseif ($d['statut'] === 'valide'): ?>
+                        <span class="statut-ok">Validé</span><br><small class="texte-doux-bloc">du <?= date('d/m/Y', strtotime($d['date_debut'])) ?> au <?= date('d/m/Y', strtotime($d['date_fin'])) ?></small>
+                    <?php else: ?>
+                        <span class="statut-refus">Refusé</span><br><small class="texte-doux-bloc"><?= e($d['motif_refus']) ?></small>
+                    <?php endif; ?>
+                </td>
+            </tr>
+        <?php endforeach; ?>
+        </tbody>
+    </table>
+    </div>
+    <?php endif; ?>
 
     <!-- RETOURS CLIENTS -->
     <h3 id="retours" style="color:var(--orange); margin:40px 0 20px;">

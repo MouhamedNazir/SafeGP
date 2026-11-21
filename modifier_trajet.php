@@ -1,10 +1,7 @@
 <?php
 require_once 'init.php';
 
-if (!isset($_SESSION['user_id'])) {
-    header("Location: connexion.php");
-    exit();
-}
+exiger_connexion();
 
 $user_id = $_SESSION['user_id'];
 $erreur = "";

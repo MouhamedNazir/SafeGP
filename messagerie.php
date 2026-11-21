@@ -2,10 +2,7 @@
 require_once 'init.php';
 
 // Seuls les connectés peuvent accéder à la messagerie
-if (!isset($_SESSION['user_id'])) {
-    header("Location: connexion.php");
-    exit();
-}
+exiger_connexion();
 
 $user_id = (int)$_SESSION['user_id'];
 
@@ -81,10 +78,7 @@ $conn->close();
 // Rendu d'un avatar (photo ou initiale)
 function avatar_conv(array $u): string
 {
-    if (!empty($u['photo'])) {
-        return '<img src="uploads/' . e($u['photo']) . '" alt="">';
-    }
-    return e(strtoupper(mb_substr($u['nom'], 0, 1)));
+    return avatar($u['nom'], $u['photo'] ?? null);
 }
 ?>
 

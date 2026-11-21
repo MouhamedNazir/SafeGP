@@ -17,11 +17,15 @@ CREATE TABLE `users` (
   `username` varchar(50) DEFAULT NULL,
   `role` enum('user','admin') DEFAULT 'user',
   `premium` tinyint(1) NOT NULL DEFAULT 0,
+  `formule` enum('gratuit','standard','illimite') NOT NULL DEFAULT 'gratuit',
+  `abonnement_fin` date DEFAULT NULL,
+  `rappel_abonnement` date DEFAULT NULL,
   `disponible` tinyint(1) NOT NULL DEFAULT 1,
   `joignable_debut` time DEFAULT NULL,
   `joignable_fin` time DEFAULT NULL,
   `whatsapp` varchar(20) DEFAULT NULL,
   `email` varchar(150) NOT NULL,
+  `email_nouveau` varchar(150) DEFAULT NULL,
   `email_verifie` tinyint(1) NOT NULL DEFAULT 0,
   `notif_email` tinyint(1) NOT NULL DEFAULT 1,
   `mot_de_passe` varchar(255) NOT NULL,
@@ -107,7 +111,7 @@ CREATE TABLE `retours` (
 CREATE TABLE `jetons` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `user_id` int(11) NOT NULL,
-  `type` enum('verification','reinitialisation') NOT NULL,
+  `type` enum('verification','reinitialisation','changement_email') NOT NULL,
   `empreinte` char(64) NOT NULL,
   `expire_le` datetime NOT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
@@ -115,6 +119,35 @@ CREATE TABLE `jetons` (
   UNIQUE KEY `empreinte` (`empreinte`),
   KEY `user_id` (`user_id`),
   CONSTRAINT `jetons_user_fk` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+CREATE TABLE `abonnements` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `user_id` int(11) NOT NULL,
+  `formule` enum('standard','illimite') NOT NULL,
+  `duree` enum('mois','an') NOT NULL,
+  `montant` int(11) NOT NULL,
+  `moyen` enum('wave','orange_money','autre') NOT NULL,
+  `reference` varchar(100) NOT NULL,
+  `telephone` varchar(20) DEFAULT NULL,
+  `statut` enum('en_attente','valide','refuse') NOT NULL DEFAULT 'en_attente',
+  `motif_refus` varchar(255) DEFAULT NULL,
+  `date_debut` date DEFAULT NULL,
+  `date_fin` date DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `traite_le` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `user_id` (`user_id`),
+  KEY `statut` (`statut`),
+  CONSTRAINT `abonnements_user_fk` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+CREATE TABLE `connexions_echouees` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `ip` varchar(45) NOT NULL,
+  `email` varchar(150) NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `ip_email` (`ip`,`email`),
+  KEY `created_at` (`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 SET FOREIGN_KEY_CHECKS = 1;

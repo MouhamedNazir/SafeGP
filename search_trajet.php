@@ -173,6 +173,7 @@ $mon_id = (int)($_SESSION['user_id'] ?? 0);
                         <?php endif; ?>
 
                         <?php afficher_boutons_whatsapp($contacts[$row['id']] ?? []); ?>
+                        <a href="retours.php?type=probleme&amp;trajet=<?= (int)$row['id'] ?>" class="lien-signaler" title="Signaler cette annonce"><i class="fa-regular fa-flag"></i> Signaler</a>
                     </div>
                 </div>
             <?php endforeach; ?>
