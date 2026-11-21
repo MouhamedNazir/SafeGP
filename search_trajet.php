@@ -55,7 +55,7 @@ if ($f['du']) {
 if ($f['au']) $ajouter('trajets.date_depart <= ?', 's', $f['au']);
 
 $sql = "
-    SELECT trajets.*, users.nom, users.photo, users.username, users.disponible
+    SELECT trajets.*, users.nom, users.photo, users.username, users.disponible, users.verifie
     FROM trajets
     LEFT JOIN users ON trajets.user_id = users.id
     " . ($conditions ? 'WHERE ' . implode(' AND ', $conditions) : '') . "
@@ -69,6 +69,7 @@ $stmt->close();
 
 // Numéros WhatsApp à afficher pour chaque trajet
 $contacts = contacts_pour_trajets($conn, $trajets);
+$stats_gp = avis_stats($conn, array_column($trajets, 'user_id'));
 $conn->close();
 
 // Titre lisible de la recherche
@@ -144,6 +145,36 @@ $mon_id = (int)($_SESSION['user_id'] ?? 0);
             </div>
         </form>
 
+        <?php
+            // Alerte possible dès qu'au moins un lieu est choisi
+            $criteres_alerte = array_filter(['pays_depart' => $f['pays_depart'], 'depart' => $f['depart'], 'pays_arrivee' => $f['pays_arrivee'], 'arrivee' => $f['arrivee']]);
+            $msgs_alerte = [
+                'creee'  => "Alerte créée : tu recevras un e-mail dès qu'un trajet correspondant est publié.",
+                'existe' => "Tu as déjà une alerte pour cette recherche.",
+                'max'    => "Tu as atteint le maximum de " . ALERTES_MAX . " alertes. Supprimes-en une dans « Mon profil ».",
+                'vide'   => "Choisis au moins un pays ou une ville pour créer une alerte.",
+            ];
+        ?>
+        <?php if (isset($msgs_alerte[$_GET['alerte'] ?? ''])): ?>
+            <div class="bandeau-info"><i class="fa-solid fa-bell"></i> <?= e($msgs_alerte[$_GET['alerte']]) ?> <a href="mon_profil.php#alertes">Gérer mes alertes</a></div>
+        <?php endif; ?>
+        <?php if ($criteres_alerte): ?>
+            <div class="bloc-alerte">
+                <span><i class="fa-regular fa-bell"></i> Recevoir un e-mail quand un nouveau trajet <strong><?= e(alerte_libelle(['pays_depart' => $f['pays_depart'] ?: null, 'depart' => $f['depart'] ?: null, 'pays_arrivee' => $f['pays_arrivee'] ?: null, 'arrivee' => $f['arrivee'] ?: null])) ?></strong> est publié</span>
+                <?php if ($mon_id): ?>
+                    <form action="alertes.php" method="POST" class="form-inline">
+                        <?= csrf_field() ?>
+                        <?php foreach ($criteres_alerte as $cle => $valeur): ?>
+                            <input type="hidden" name="<?= e($cle) ?>" value="<?= e($valeur) ?>">
+                        <?php endforeach; ?>
+                        <button type="submit" class="btn-contact btn-petit"><i class="fa-solid fa-bell"></i> Créer une alerte</button>
+                    </form>
+                <?php else: ?>
+                    <a href="connexion.php?suite=<?= e(urlencode('search_trajet.php?' . http_build_query($criteres_alerte))) ?>" class="btn-contact btn-petit">Se connecter pour créer une alerte</a>
+                <?php endif; ?>
+            </div>
+        <?php endif; ?>
+
         <p class="resultats-resume">
             <strong><?= count($trajets) ?></strong> trajet<?= count($trajets) > 1 ? 's' : '' ?> · <?= e($titre) ?>
             <?php if ($f['du'] || $f['au']): ?>
@@ -160,6 +191,7 @@ $mon_id = (int)($_SESSION['user_id'] ?? 0);
                     <?php $avec_gp = true; include 'trajet_infos.php'; ?>
 
                     <div class="annonce-footer">
+                        <a href="trajet.php?id=<?= (int)$row['id'] ?>" class="btn-contact btn-secondaire"><i class="fa-solid fa-share-nodes"></i> Voir / partager</a>
                         <?php if ($row['user_id'] && (int)$row['user_id'] !== $mon_id): ?>
                             <a href="messagerie.php?with=<?= (int)$row['user_id'] ?>&amp;trajet=<?= (int)$row['id'] ?>" class="btn-contact">
                                 <i class="fa-solid fa-message"></i> Contacter pour ce trajet

@@ -22,12 +22,17 @@
 
         <div class="footer-contact">
             <h4>Contact</h4>
-            <p><i class="fa-solid fa-envelope"></i> contact@safegp.com</p>
-            <p><i class="fa-solid fa-mobile-screen"></i> +212 6 75 84 75 25</p>
+            <p><a href="retours.php"><i class="fa-solid fa-envelope"></i> Écrire à l'équipe</a></p>
+            <?php foreach ((defined('CONTACT_TELEPHONES') ? CONTACT_TELEPHONES : []) as $tel): ?>
+                <p><a href="tel:<?= e(preg_replace('/\s+/', '', $tel)) ?>"><i class="fa-solid fa-mobile-screen"></i> <?= e($tel) ?></a></p>
+            <?php endforeach; ?>
         </div>
     </div>
 
     <div class="footer-bas">
         <p>© <?= date('Y') ?> SafeGP — Tous droits réservés · <a href="conditions.php">Conditions d'utilisation</a></p>
+        <p class="footer-dev">Conçu et développé par <strong>Mouhamed Nazirou Ndiaye</strong> ·
+            <a href="https://www.linkedin.com/in/mouhamed-nazirou-ndiaye" target="_blank" rel="noopener"><i class="fa-brands fa-linkedin"></i> LinkedIn</a> ·
+            <a href="https://github.com/MouhamedNazir" target="_blank" rel="noopener"><i class="fa-brands fa-github"></i> GitHub</a></p>
     </div>
 </footer>

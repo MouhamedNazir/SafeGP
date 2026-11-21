@@ -9,6 +9,7 @@
 // ============================================================
 
 require_once __DIR__ . '/erreurs.php';   // en premier : capte aussi une panne de la base
+require_once __DIR__ . '/langue.php';    // français / anglais (LANGUE)
 require_once __DIR__ . '/config.php';    // $conn
 forcer_https_si_demande();
 $conn->set_charset('utf8mb4');
@@ -27,7 +28,16 @@ if (!headers_sent()) {
     header('Permissions-Policy: camera=(), microphone=(), geolocation=()');
 }
 
+// Une fois par jour : les trajets dont la date d'arrivée est passée
+// passent automatiquement au statut « arrivé »
+$drapeau_maj = __DIR__ . '/logs/maj_trajets.txt';
+if (@file_get_contents($drapeau_maj) !== date('Y-m-d')) {
+    $conn->query("UPDATE trajets SET statut = 'arrivé' WHERE date_arrivee < CURDATE() AND statut <> 'arrivé'");
+    @file_put_contents($drapeau_maj, date('Y-m-d'));
+}
+
 require_once __DIR__ . '/csrf.php';      // démarre la session (cookie sécurisé)
+demarrer_traduction();                    // en anglais : la page est traduite avant l'envoi
 require_once __DIR__ . '/pays.php';
 require_once __DIR__ . '/fonctions.php';
 require_once __DIR__ . '/email.php';
@@ -48,6 +58,14 @@ if (isset($_SESSION['user_id'])) {
     $check_admin->execute();
     $check_role = $check_admin->get_result()->fetch_assoc();
     $check_admin->close();
+
+    // Changement de langue : mémorisé sur le compte (langue des e-mails)
+    if (isset($_GET['lang']) && in_array($_GET['lang'], LANGUES, true)) {
+        $maj_langue = $conn->prepare("UPDATE users SET langue = ? WHERE id = ?");
+        $maj_langue->bind_param("si", $_GET['lang'], $_SESSION['user_id']);
+        $maj_langue->execute();
+        $maj_langue->close();
+    }
 
     if (!$check_role) {
         // Compte supprimé entre-temps : on déconnecte
@@ -83,5 +101,6 @@ if (isset($_SESSION['user_id'])) {
 $nav_retours_non_lus = 0;
 if ($nav_is_admin) {
     $nav_retours_non_lus = (int)$conn->query("SELECT COUNT(*) FROM retours WHERE lu = 0")->fetch_row()[0]
-        + (int)$conn->query("SELECT COUNT(*) FROM abonnements WHERE statut = 'en_attente'")->fetch_row()[0];
+        + (int)$conn->query("SELECT COUNT(*) FROM abonnements WHERE statut = 'en_attente'")->fetch_row()[0]
+        + (int)$conn->query("SELECT COUNT(*) FROM verifications WHERE statut = 'en_attente'")->fetch_row()[0];
 }

@@ -57,8 +57,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             // password_hash() = bcrypt, avec un sel aléatoire par mot de passe
             $hash = password_hash($mot_de_passe, PASSWORD_DEFAULT);
 
-            $stmt = $conn->prepare("INSERT INTO users (nom, username, email, mot_de_passe) VALUES (?, ?, ?, ?)");
-            $stmt->bind_param("ssss", $nom, $username, $email, $hash);
+            $langue = LANGUE;
+            $stmt = $conn->prepare("INSERT INTO users (nom, username, email, mot_de_passe, langue) VALUES (?, ?, ?, ?, ?)");
+            $stmt->bind_param("sssss", $nom, $username, $email, $hash, $langue);
 
             if ($stmt->execute()) {
                 $success = true;

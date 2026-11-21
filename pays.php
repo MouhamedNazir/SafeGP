@@ -63,16 +63,26 @@ const PAYS = [
 // Pays proposés en tête des listes (les plus fréquents sur SafeGP)
 const PAYS_FREQUENTS = ['MA', 'SN', 'FR', 'ES', 'IT', 'BE', 'US', 'CA', 'CI', 'ML', 'MR', 'GN'];
 
+// Noms des pays dans la langue du visiteur
+function liste_pays(): array
+{
+    static $en = null;
+    if (defined('LANGUE') && LANGUE === 'en') {
+        return $en ??= require __DIR__ . '/lang/pays_en.php';
+    }
+    return PAYS;
+}
+
 function nom_pays(?string $code): string
 {
-    return PAYS[$code ?? ''] ?? '';
+    return liste_pays()[$code ?? ''] ?? '';
 }
 
 // Drapeau (petite image) — vide si pays inconnu
 function drapeau(?string $code): string
 {
     if (empty($code) || !isset(PAYS[$code])) return '';
-    return '<span class="fi fi-' . strtolower($code) . '" title="' . htmlspecialchars(PAYS[$code]) . '"></span>';
+    return '<span class="fi fi-' . strtolower($code) . '" title="' . htmlspecialchars(nom_pays($code)) . '"></span>';
 }
 
 // <option> d'un menu de pays : fréquents d'abord, puis tous par ordre alphabétique
@@ -81,10 +91,10 @@ function options_pays(?string $selection, string $libelle_vide = 'Choisir un pay
     $html = '<option value="">' . htmlspecialchars($libelle_vide) . '</option>';
     $html .= '<optgroup label="Les plus fréquents">';
     foreach (PAYS_FREQUENTS as $code) {
-        $html .= '<option value="' . $code . '"' . ($selection === $code ? ' selected' : '') . '>' . htmlspecialchars(PAYS[$code]) . '</option>';
+        $html .= '<option value="' . $code . '"' . ($selection === $code ? ' selected' : '') . '>' . htmlspecialchars(nom_pays($code)) . '</option>';
     }
     $html .= '</optgroup><optgroup label="Tous les pays">';
-    $tous = PAYS;
+    $tous = liste_pays();
     // Tri alphabétique sans tenir compte des accents (É avec E)
     uasort($tous, fn($a, $b) => strcmp(sans_accents($a), sans_accents($b)));
     foreach ($tous as $code => $nom) {

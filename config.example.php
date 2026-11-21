@@ -41,3 +41,12 @@ define('EMAIL_NOM', 'SafeGP');
 define('PAIEMENT_WAVE', '');             // ex : '+221 77 000 00 00'
 define('PAIEMENT_ORANGE_MONEY', '');     // ex : '+221 77 000 00 00'
 define('PAIEMENT_TITULAIRE', '');        // nom affiché du titulaire des comptes
+
+// Virement bancaire (pour les membres hors zone mobile money) ; vide = masqué
+define('BANQUE_NOM', '');                // ex : 'CIH Bank'
+define('BANQUE_RIB', '');
+define('BANQUE_IBAN', '');
+define('BANQUE_SWIFT', '');
+
+// ---------- Contact affiché dans le pied de page ----------
+define('CONTACT_TELEPHONES', []);        // ex : ['+212 6 00 00 00 00', '+221 77 000 00 00']

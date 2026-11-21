@@ -13,3 +13,7 @@ Thumbs.db
 # Journaux d'erreurs et e-mails enregistrés en local
 logs/*
 !logs/.htaccess
+
+# Pièces d'identité envoyées pour le badge « vérifié » (données privées)
+verifications/*
+!verifications/.htaccess

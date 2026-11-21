@@ -105,7 +105,7 @@ $conn->close();
                 <div class="form-group">
                     <label>Ton message</label>
                     <textarea name="message" required maxlength="3000" style="height:160px;"
-                              placeholder="Ex : Ce serait pratique de pouvoir filtrer les trajets par date..."><?= e($_POST['message'] ?? ($trajet_signale ? "Je signale l'annonce n°" . $trajet_signale . " (profil.php#trajet-" . $trajet_signale . ") car : " : '')) ?></textarea>
+                              placeholder="Ex : Ce serait pratique de pouvoir filtrer les trajets par date..."><?= e($_POST['message'] ?? ($trajet_signale ? "Je signale l'annonce n°" . $trajet_signale . " (trajet.php?id=" . $trajet_signale . ") car : " : '')) ?></textarea>
                 </div>
 
                 <?php if (!$connecte): ?>

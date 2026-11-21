@@ -85,6 +85,53 @@ if (isset($_POST['changer_formule'])) {
     exit();
 }
 
+// Vérifications d'identité : valider (badge) ou refuser ; la photo est supprimée dans les deux cas
+if (isset($_POST['traiter_verification'])) {
+    $vid = (int)$_POST['traiter_verification'];
+    $valider = ($_POST['decision'] ?? '') === 'valider';
+    $stmt = $conn->prepare("SELECT v.*, u.email, u.nom FROM verifications v JOIN users u ON u.id = v.user_id WHERE v.id = ? AND v.statut = 'en_attente'");
+    $stmt->bind_param("i", $vid);
+    $stmt->execute();
+    $v = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    if ($v) {
+        if ($v['fichier'] && preg_match('/^[a-f0-9]{32}\.(img|jpg)$/', $v['fichier'])) {
+            @unlink(__DIR__ . '/verifications/' . $v['fichier']);
+        }
+        $statut = $valider ? 'valide' : 'refuse';
+        $motif = $valider ? null : (mb_substr(trim($_POST['motif'] ?? ''), 0, 255) ?: 'Photo illisible ou document non valable');
+        $stmt = $conn->prepare("UPDATE verifications SET statut = ?, motif_refus = ?, fichier = NULL, traite_le = NOW() WHERE id = ?");
+        $stmt->bind_param("ssi", $statut, $motif, $vid);
+        $stmt->execute();
+        $stmt->close();
+        if ($valider) {
+            $stmt = $conn->prepare("UPDATE users SET verifie = 1 WHERE id = ?");
+            $stmt->bind_param("i", $v['user_id']);
+            $stmt->execute();
+            $stmt->close();
+        }
+        email_envoyer($v['email'], $valider ? 'Ton compte est vérifié - SafeGP' : 'Vérification d\'identité - SafeGP', email_gabarit(
+            $valider ? 'Ton badge « vérifié » est actif' : 'Vérification non validée',
+            '<p>Bonjour ' . htmlspecialchars($v['nom']) . ',</p>' . ($valider
+                ? '<p>Ton identité a été vérifiée : le badge ✔ s\'affiche maintenant sur ton profil et tes annonces. Ta pièce d\'identité a été supprimée de nos serveurs.</p>'
+                : '<p>Nous n\'avons pas pu valider ta pièce d\'identité.</p><p><strong>Motif :</strong> ' . htmlspecialchars($motif) . '</p><p>Ta photo a été supprimée ; tu peux en envoyer une nouvelle depuis « Mon profil ».</p>'),
+            'Mon profil',
+            url_site() . '/mon_profil.php#verification'
+        ));
+    }
+    header("Location: admin.php?success=verification_traitee#verifications");
+    exit();
+}
+if (isset($_POST['retirer_badge'])) {
+    $id = (int)$_POST['retirer_badge'];
+    $stmt = $conn->prepare("UPDATE users SET verifie = 0 WHERE id = ?");
+    $stmt->bind_param("i", $id);
+    $stmt->execute();
+    $stmt->close();
+    header("Location: admin.php?success=badge_retire");
+    exit();
+}
+
 // Demandes d'abonnement : valider (après vérification du paiement) ou refuser
 if (isset($_POST['valider_abonnement'])) {
     $ok = abonnement_valider($conn, (int)$_POST['valider_abonnement']);
@@ -137,10 +184,25 @@ $trajets_dispo = $conn->query("SELECT COUNT(*) as total FROM trajets WHERE statu
 
 // Tous les utilisateurs, avec leurs publications du mois (limite freemium)
 $debut_mois = $conn->real_escape_string(date('Y-m-01 00:00:00'));
-$users = $conn->query("
+// Recherche + pagination (25 par page)
+$motif_like = fn($t) => '%' . addcslashes($t, '%_\\') . '%';
+$qu = trim($_GET['qu'] ?? '');
+$pu = max(1, (int)($_GET['pu'] ?? 1));
+$filtre_u = $qu !== '' ? "WHERE users.nom LIKE ? OR users.username LIKE ? OR users.email LIKE ?" : "";
+$stmt = $conn->prepare("SELECT COUNT(*) FROM users $filtre_u");
+if ($qu !== '') { $m = $motif_like($qu); $stmt->bind_param("sss", $m, $m, $m); }
+$stmt->execute();
+$total_u = (int)$stmt->get_result()->fetch_row()[0];
+$stmt->close();
+$decalage_u = ($pu - 1) * PAR_PAGE;
+$stmt = $conn->prepare("
     SELECT users.*,
            (SELECT COUNT(*) FROM trajets WHERE trajets.user_id = users.id AND trajets.created_at >= '$debut_mois') AS publications_mois
-    FROM users ORDER BY created_at DESC");
+    FROM users $filtre_u ORDER BY created_at DESC LIMIT " . PAR_PAGE . " OFFSET " . $decalage_u);
+if ($qu !== '') { $stmt->bind_param("sss", $m, $m, $m); }
+$stmt->execute();
+$users = $stmt->get_result();
+$stmt->close();
 
 // Demandes d'abonnement : en attente, puis les 15 dernières traitées
 $demandes = $conn->query("
@@ -152,6 +214,9 @@ $demandes_en_attente = count(array_filter($demandes, fn($d) => $d['statut'] === 
 $revenus_mois = (int)$conn->query("SELECT COALESCE(SUM(montant), 0) FROM abonnements WHERE statut = 'valide' AND traite_le >= '" . date('Y-m-01') . "'")->fetch_row()[0];
 $abonnes_actifs = (int)$conn->query("SELECT COUNT(*) FROM users WHERE formule <> 'gratuit' AND (abonnement_fin IS NULL OR abonnement_fin >= CURDATE())")->fetch_row()[0];
 
+// Vérifications d'identité en attente
+$verifications = $conn->query("SELECT v.*, u.nom, u.username FROM verifications v JOIN users u ON u.id = v.user_id WHERE v.statut = 'en_attente' ORDER BY v.id")->fetch_all(MYSQLI_ASSOC);
+
 // Retours clients, non lus d'abord
 $retours = $conn->query("
     SELECT retours.*, users.username
@@ -160,12 +225,24 @@ $retours = $conn->query("
 $retours_non_lus = (int)$conn->query("SELECT COUNT(*) FROM retours WHERE lu = 0")->fetch_row()[0];
 
 // Tous les trajets
-$trajets = $conn->query("
-    SELECT trajets.*, users.nom 
-    FROM trajets 
-    LEFT JOIN users ON trajets.user_id = users.id 
-    ORDER BY trajets.id DESC
-");
+$qt = trim($_GET['qt'] ?? '');
+$pt = max(1, (int)($_GET['pt'] ?? 1));
+$filtre_t = $qt !== '' ? "WHERE trajets.depart LIKE ? OR trajets.arrivee LIKE ? OR users.nom LIKE ? OR users.username LIKE ?" : "";
+$stmt = $conn->prepare("SELECT COUNT(*) FROM trajets LEFT JOIN users ON trajets.user_id = users.id $filtre_t");
+if ($qt !== '') { $mt = $motif_like($qt); $stmt->bind_param("ssss", $mt, $mt, $mt, $mt); }
+$stmt->execute();
+$total_t = (int)$stmt->get_result()->fetch_row()[0];
+$stmt->close();
+$stmt = $conn->prepare("
+    SELECT trajets.*, users.nom
+    FROM trajets
+    LEFT JOIN users ON trajets.user_id = users.id
+    $filtre_t
+    ORDER BY trajets.id DESC LIMIT " . PAR_PAGE . " OFFSET " . (($pt - 1) * PAR_PAGE));
+if ($qt !== '') { $stmt->bind_param("ssss", $mt, $mt, $mt, $mt); }
+$stmt->execute();
+$trajets = $stmt->get_result();
+$stmt->close();
 
 $conn->close();
 ?>
@@ -193,6 +270,8 @@ $conn->close();
                 if ($_GET['success'] == 'abonnement_valide') echo "Abonnement validé et activé, le membre a été prévenu par e-mail.";
                 if ($_GET['success'] == 'abonnement_refuse') echo "Demande refusée, le membre a été prévenu par e-mail.";
                 if ($_GET['success'] == 'abonnement_deja_traite') echo "Cette demande avait déjà été traitée.";
+                if ($_GET['success'] == 'verification_traitee') echo "Vérification traitée, la pièce d'identité a été supprimée.";
+                if ($_GET['success'] == 'badge_retire') echo "Badge « vérifié » retiré.";
                 if ($_GET['success'] == 'retour_supprime') echo "Retour supprimé !";
             ?>
         </p>
@@ -236,9 +315,13 @@ $conn->close();
     </div>
 
     <!-- UTILISATEURS -->
-    <h3 style="color:var(--orange); margin-bottom:20px;">
-        <i class="fa-solid fa-users"></i> Utilisateurs
-    </h3>
+    <h3 id="membres" class="titre-admin"><i class="fa-solid fa-users"></i> Utilisateurs (<?= $total_u ?>)</h3>
+    <form method="GET" action="admin.php#membres" class="recherche-admin">
+        <input type="search" name="qu" value="<?= e($qu) ?>" placeholder="Nom, @utilisateur ou e-mail" class="select-petit">
+        <?php if ($qt !== ''): ?><input type="hidden" name="qt" value="<?= e($qt) ?>"><?php endif; ?>
+        <button type="submit" class="btn-contact btn-petit"><i class="fa-solid fa-magnifying-glass"></i></button>
+        <?php if ($qu !== ''): ?><a href="admin.php#membres" class="lien-discret">Effacer</a><?php endif; ?>
+    </form>
 
     <div class="table-defilante">
     <table class="admin-table">
@@ -259,7 +342,15 @@ $conn->close();
             <tr>
                 <td><?= $user['id'] ?></td>
                 <td><?= htmlspecialchars($user['nom']) ?></td>
-                <td>@<?= htmlspecialchars($user['username'] ?? '') ?></td>
+                <td>@<?= htmlspecialchars($user['username'] ?? '') ?>
+                    <?php if ($user['verifie']): ?>
+                        <form action="admin.php" method="POST" class="form-inline" onsubmit="return confirm('Retirer le badge vérifié ?')">
+                            <?= csrf_field() ?>
+                            <?= badge_verifie(1) ?>
+                            <button type="submit" name="retirer_badge" value="<?= (int)$user['id'] ?>" class="btn-lien" title="Retirer le badge"><i class="fa-solid fa-xmark"></i></button>
+                        </form>
+                    <?php endif; ?>
+                </td>
                 <td><?= htmlspecialchars($user['email']) ?></td>
                 <td>
                     <!-- Changer le rôle -->
@@ -315,10 +406,16 @@ $conn->close();
     </table>
     </div>
 
+    <?= pagination($total_u, $pu, 'pu', '#membres') ?>
+
     <!-- TRAJETS -->
-    <h3 style="color:var(--orange); margin:40px 0 20px;">
-        <i class="fa-solid fa-plane"></i> Trajets
-    </h3>
+    <h3 id="trajets" class="titre-admin"><i class="fa-solid fa-plane"></i> Trajets (<?= $total_t ?>)</h3>
+    <form method="GET" action="admin.php#trajets" class="recherche-admin">
+        <input type="search" name="qt" value="<?= e($qt) ?>" placeholder="Ville ou GP" class="select-petit">
+        <?php if ($qu !== ''): ?><input type="hidden" name="qu" value="<?= e($qu) ?>"><?php endif; ?>
+        <button type="submit" class="btn-contact btn-petit"><i class="fa-solid fa-magnifying-glass"></i></button>
+        <?php if ($qt !== ''): ?><a href="admin.php#trajets" class="lien-discret">Effacer</a><?php endif; ?>
+    </form>
 
     <div class="table-defilante">
     <table class="admin-table">
@@ -369,6 +466,41 @@ $conn->close();
         </tbody>
     </table>
     </div>
+    <?= pagination($total_t, $pt, 'pt', '#trajets') ?>
+
+    <!-- VÉRIFICATIONS D'IDENTITÉ -->
+    <h3 id="verifications" class="titre-admin">
+        <i class="fa-solid fa-id-card"></i> Vérifications d'identité
+        <?php if ($verifications): ?><span class="badge-nonlu"><?= count($verifications) ?></span><?php endif; ?>
+    </h3>
+    <?php if (!$verifications): ?>
+        <p class="texte-doux-bloc">Aucune pièce d'identité à vérifier.</p>
+    <?php else: ?>
+        <p class="aide-contact">Vérifie que le nom correspond au profil et que la photo est lisible. La pièce est supprimée dès que tu valides ou refuses.</p>
+        <?php foreach ($verifications as $v): ?>
+            <div class="retour-carte">
+                <div class="retour-entete">
+                    <a href="profil.php?id=<?= (int)$v['user_id'] ?>">@<?= e($v['username'] ?? $v['nom']) ?></a>
+                    <span><?= e($v['nom']) ?></span>
+                    <span class="msg-date"><?= date('d/m/Y H:i', strtotime($v['created_at'])) ?></span>
+                    <a href="piece_identite.php?id=<?= (int)$v['id'] ?>" target="_blank" rel="noopener" class="btn-contact btn-secondaire btn-petit"><i class="fa-solid fa-eye"></i> Voir la pièce</a>
+                </div>
+                <div class="retour-actions">
+                    <form action="admin.php" method="POST" class="form-inline" onsubmit="return confirm('Valider l\'identité de ce membre ?')">
+                        <?= csrf_field() ?>
+                        <input type="hidden" name="decision" value="valider">
+                        <button type="submit" name="traiter_verification" value="<?= (int)$v['id'] ?>" class="btn-contact btn-petit"><i class="fa-solid fa-check"></i> Valider</button>
+                    </form>
+                    <form action="admin.php" method="POST" class="refus-inline">
+                        <?= csrf_field() ?>
+                        <input type="hidden" name="decision" value="refuser">
+                        <input type="text" name="motif" class="select-petit" placeholder="Motif du refus" maxlength="255">
+                        <button type="submit" name="traiter_verification" value="<?= (int)$v['id'] ?>" class="btn-contact btn-petit btn-supprimer">Refuser</button>
+                    </form>
+                </div>
+            </div>
+        <?php endforeach; ?>
+    <?php endif; ?>
 
     <!-- ABONNEMENTS -->
     <h3 id="abonnements" class="titre-admin">

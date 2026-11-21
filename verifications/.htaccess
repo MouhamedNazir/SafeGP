@@ -1,0 +1,8 @@
+# Pièces d'identité : jamais accessibles depuis le web (seul l'admin les voit via piece_identite.php)
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+<IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+</IfModule>

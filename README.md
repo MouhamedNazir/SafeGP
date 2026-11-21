@@ -35,6 +35,12 @@ Plateforme web de mise en relation entre **GP** (voyageurs/transporteurs) et **e
 - Site adapté au mobile (menu ☰, messagerie, tableaux admin)
 - Sécurité : mots de passe bcrypt, requêtes préparées, jetons CSRF, cookies de session sécurisés, HTTPS forcé (optionnel), erreurs masquées en ligne, blocage après 5 essais de connexion, en-têtes de sécurité, aucun script exécutable dans uploads/
 - Conditions d'utilisation, signalement d'annonces
+- Avis et notes des GP (seulement après un échange de messages), badge « GP vérifié » (pièce d'identité contrôlée puis supprimée)
+- Page dédiée à chaque annonce avec partage WhatsApp / Facebook et aperçu soigné du lien
+- Alertes de trajets par e-mail (« préviens-moi quand un trajet France → Sénégal est publié »)
+- Site en français et en anglais (bouton FR / EN, e-mails dans la langue du membre)
+- Paiement des abonnements par Wave, Orange Money ou virement bancaire
+- Photos compressées automatiquement, trajets terminés passés en « arrivé », page 404, recherche et pagination dans l'admin
 
 ##  Aperçu
 
@@ -75,7 +81,7 @@ Plateforme web de mise en relation entre **GP** (voyageurs/transporteurs) et **e
    git clone https://github.com/MouhamedNazir/SafeGP.git
    ```
 2. Créer une base de données MySQL nommée `safegp` puis y importer `schema.sql`
-   - Base déjà existante : appliquer à la place les fichiers de `migrations/` dans l'ordre
+   - Base déjà existante : appliquer à la place les fichiers de `migrations/` dans l'ordre (001 à 005)
 3. Copier `config.example.php` en `config.php` et renseigner vos identifiants de connexion à la base
    (et, pour les e-mails, un serveur SMTP : voir les commentaires du fichier)
 4. Lancer le projet sur un serveur local (ex. XAMPP/WAMP) et ouvrir `index.php`

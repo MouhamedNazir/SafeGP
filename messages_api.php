@@ -18,7 +18,7 @@ function repondre(array $donnees, int $code = 200): void
 }
 
 if (!isset($_SESSION['user_id'])) {
-    repondre(['erreur' => 'Non connecté'], 401);
+    repondre(['erreur' => t('Non connecté')], 401);
 }
 $moi = (int)$_SESSION['user_id'];
 $action = $_POST['action'] ?? $_GET['action'] ?? '';
@@ -38,7 +38,7 @@ if ($action === 'envoyer' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $trajet_id = (int)($_POST['trajet_id'] ?? 0) ?: null;
     $resultat = message_envoyer($conn, $moi, $_SESSION['user_nom'] ?? 'Un membre', $destinataire, (string)($_POST['contenu'] ?? ''), $trajet_id);
     if (is_string($resultat)) {
-        repondre(['erreur' => $resultat], 400);
+        repondre(['erreur' => t($resultat)], 400);
     }
     repondre(['ok' => true, 'id' => $resultat]);
 }

@@ -20,15 +20,17 @@ $stmt->close();
 
 // GPs disponibles ayant au moins un trajet disponible (le plus récent en premier)
 $gps = $conn->query("
-    SELECT users.id, users.nom, users.username, users.photo,
+    SELECT users.id, users.nom, users.username, users.photo, users.verifie,
            COUNT(trajets.id) AS nb_trajets, MAX(trajets.id) AS dernier
     FROM users
     INNER JOIN trajets ON users.id = trajets.user_id
     WHERE trajets.statut = 'disponible' AND users.disponible = 1
-    GROUP BY users.id, users.nom, users.username, users.photo
+    GROUP BY users.id, users.nom, users.username, users.photo, users.verifie
     ORDER BY dernier DESC
     LIMIT 6
 ")->fetch_all(MYSQLI_ASSOC);
+
+$stats_gp = avis_stats($conn, array_column($gps, 'id'));
 
 // Quelques chiffres pour rassurer les visiteurs
 $stats = $conn->query("
@@ -99,7 +101,7 @@ $conn->close();
         </div>
         <div class="grille-trajets">
             <?php foreach ($prochains as $t): ?>
-            <a href="profil.php?id=<?= (int)$t['gp_id'] ?>#trajet-<?= (int)$t['id'] ?>" class="carte-trajet">
+            <a href="trajet.php?id=<?= (int)$t['id'] ?>" class="carte-trajet">
                 <div class="carte-trajet-route">
                     <span><?= drapeau($t['pays_depart']) ?> <?= e($t['depart']) ?></span>
                     <i class="fa-solid fa-plane"></i>
@@ -161,7 +163,8 @@ $conn->close();
                     <?= avatar($gp['nom'], $gp['photo']) ?>
                 </div>
                 <div class="gp-card-info">
-                    <h4><?= e($gp['nom']) ?></h4>
+                    <h4><?= e($gp['nom']) ?> <?= badge_verifie($gp['verifie']) ?></h4>
+                    <?= resume_avis($stats_gp[$gp['id']] ?? null) ?>
                     <p class="texte-orange">@<?= e($gp['username'] ?? '') ?></p>
                     <p class="gp-card-trajet"><i class="fa-solid fa-plane"></i> <?= (int)$gp['nb_trajets'] ?> trajet<?= $gp['nb_trajets'] > 1 ? 's' : '' ?> disponible<?= $gp['nb_trajets'] > 1 ? 's' : '' ?></p>
                 </div>

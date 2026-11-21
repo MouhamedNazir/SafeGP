@@ -60,6 +60,20 @@ function email_envoyer(string $destinataire, string $sujet, string $html): bool
         return false;
     }
 
+    // E-mail dans la langue choisie par le destinataire
+    global $conn;
+    if ($conn instanceof mysqli && function_exists('traduire_html')) {
+        $stmt = $conn->prepare("SELECT langue FROM users WHERE email = ? LIMIT 1");
+        $stmt->bind_param("s", $destinataire);
+        $stmt->execute();
+        $langue_dest = $stmt->get_result()->fetch_row()[0] ?? 'fr';
+        $stmt->close();
+        if ($langue_dest !== 'fr') {
+            $sujet = t($sujet, $langue_dest, true);
+            $html = traduire_html($html, $langue_dest, true);
+        }
+    }
+
     // Local sans SMTP : on enregistre l'e-mail dans un fichier
     if (!smtp_configure()) {
         if (!est_en_local()) {

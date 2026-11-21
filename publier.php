@@ -48,11 +48,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             if ($t['pour_autrui']) {
                 contacts_enregistrer($conn, $user_id, $trajet_id, $contacts_valeurs);
             }
+            // Prévenir les membres qui ont une alerte sur ce trajet
+            alertes_notifier($conn, $trajet_id);
             // Redirection vers un formulaire vide : un rafraîchissement
             // de la page ne republie pas le trajet une deuxième fois
             $stmt->close();
             $conn->close();
-            header("Location: publier.php?publie=1");
+            header("Location: publier.php?publie=" . (int)$trajet_id);
             exit();
         } else {
             $erreur = "Erreur lors de la publication.";
@@ -76,7 +78,9 @@ $conn->close();
         <h2>Publier un trajet</h2>
 
         <?php if ($success): ?>
-            <p class="success"><i class="fa-solid fa-circle-check" style="color:var(--vert);"></i> Trajet publié avec succès ! <a href="dashboard.php">Voir mes trajets</a></p>
+            <p class="success"><i class="fa-solid fa-circle-check" style="color:var(--vert);"></i> Trajet publié avec succès !
+                <?php if ((int)$_GET['publie'] > 0): ?><a href="trajet.php?id=<?= (int)$_GET['publie'] ?>">Voir et partager l'annonce</a> ·<?php endif; ?>
+                <a href="dashboard.php">Mes trajets</a></p>
         <?php endif; ?>
 
         <?php if ($erreur): ?>

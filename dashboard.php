@@ -111,6 +111,7 @@ $conn->close();
                         </form>
 
                         <!-- Bouton modifier → redirige vers modifier_trajet.php avec l'id -->
+                        <a href="trajet.php?id=<?= (int)$row['id'] ?>" class="btn-contact btn-secondaire"><i class="fa-solid fa-share-nodes"></i> Voir / partager</a>
                         <a href="modifier_trajet.php?id=<?= $row['id'] ?>" class="btn-contact btn-secondaire">
                             <i class="fa-solid fa-pen"></i> Modifier
                         </a>

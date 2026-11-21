@@ -36,6 +36,8 @@ $depot_cloture = !empty($row['date_limite_depot']) && $row['date_limite_depot'] 
 <div class="gp-nom">
     <span class="avatar-mini"><?= avatar($row['nom'], $row['photo']) ?></span>
     <a href="profil.php?id=<?= (int)$row['user_id'] ?>">@<?= e($row['username'] ?? $row['nom']) ?></a>
+    <?= badge_verifie($row['verifie'] ?? 0) ?>
+    <?= resume_avis($stats_gp[$row['user_id']] ?? null) ?>
     <?= badge_dispo_gp($row['disponible'] ?? 1) ?>
 </div>
 <?php endif; ?>

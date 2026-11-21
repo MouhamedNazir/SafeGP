@@ -9,7 +9,7 @@ $q = trim($_GET['q'] ?? '');
 $q_sql = ltrim($q, '@'); // "@moussa" → "moussa"
 
 $requete = "
-    SELECT users.id, users.nom, users.username, users.photo, users.disponible,
+    SELECT users.id, users.nom, users.username, users.photo, users.disponible, users.verifie,
            COUNT(trajets.id) AS nb_trajets,
            SUM(trajets.statut = 'disponible') AS nb_dispo
     FROM users
@@ -34,6 +34,7 @@ if ($q_sql !== '') {
 $stmt->execute();
 $membres = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
+$stats_gp = avis_stats($conn, array_column($membres, 'id'));
 $conn->close();
 ?>
 
@@ -69,7 +70,8 @@ $conn->close();
                     <?= avatar($m['nom'], $m['photo']) ?>
                 </div>
                 <div class="gp-card-info">
-                    <h4><?= e($m['nom']) ?></h4>
+                    <h4><?= e($m['nom']) ?> <?= badge_verifie($m['verifie']) ?></h4>
+                    <?= resume_avis($stats_gp[$m['id']] ?? null) ?>
                     <?php if (!empty($m['username'])): ?>
                         <p style="color:var(--orange);">@<?= e($m['username']) ?></p>
                     <?php endif; ?>

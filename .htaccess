@@ -1,0 +1,29 @@
+# ============================================================
+# SafeGP — réglages Apache
+# ============================================================
+
+# Page « introuvable » soignée (chemin depuis la racine du site :
+# correct en ligne ; en local dans /SafeGP/, Apache garde sa page par défaut)
+ErrorDocument 404 /404.php
+
+# Fichiers internes jamais téléchargeables : scripts SQL, notes, journaux
+<FilesMatch "\.(sql|md|log|txt)$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
+</FilesMatch>
+
+# ... sauf robots.txt, lu par les moteurs de recherche
+<Files "robots.txt">
+    <IfModule mod_authz_core.c>
+        Require all granted
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order deny,allow
+        Allow from all
+    </IfModule>
+</Files>

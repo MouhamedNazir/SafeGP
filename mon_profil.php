@@ -31,9 +31,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_FILES['photo']) && $_FILES['
     if (!in_array($extension, $extensions_autorisees)) {
         $erreur = "Format non autorisé. Utilise JPG, PNG ou WEBP.";
 
-    // Vérification 2 — la taille ne dépasse pas 2MB ?
-    } elseif ($fichier['size'] > 2 * 1024 * 1024) {
-        $erreur = "L'image ne doit pas dépasser 2MB.";
+    // Vérification 2 — taille : 8 Mo si le serveur peut compresser (GD), sinon 2 Mo
+    } elseif ($fichier['size'] > (function_exists('imagecreatefromstring') ? 8 : 2) * 1024 * 1024) {
+        $erreur = "L'image ne doit pas dépasser " . (function_exists('imagecreatefromstring') ? 8 : 2) . " Mo.";
 
     // Vérification 3 — le contenu est-il vraiment une image ?
     // L'extension se falsifie facilement (ex: script.php renommé en photo.jpg),
@@ -53,6 +53,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_FILES['photo']) && $_FILES['
 
         // On déplace le fichier du dossier temporaire vers uploads/
         if (move_uploaded_file($fichier['tmp_name'], $destination)) {
+            // Redimensionnement à 400 px et compression JPEG (pages plus légères)
+            $destination = compresser_image($destination, 400);
+            $nouveau_nom = basename($destination);
+            // Ancienne photo avec une autre extension : on la supprime
+            if (!empty($user['photo']) && $user['photo'] !== $nouveau_nom && preg_match('/^user_' . $user_id . '\.(jpe?g|png|webp)$/', $user['photo'])) {
+                @unlink('uploads/' . $user['photo']);
+            }
             // On met à jour le nom de la photo dans la DB
             $stmt = $conn->prepare("UPDATE users SET photo = ? WHERE id = ?");
             $stmt->bind_param("si", $nouveau_nom, $user_id);
@@ -163,6 +170,58 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['changer_email'])) {
         $success = "Un lien de confirmation a été envoyé à " . $nouvel_email . ".";
     }
 }
+
+// ============================================================
+// BADGE « GP VÉRIFIÉ » : envoi d'une photo de pièce d'identité
+// Stockée dans verifications/ (dossier fermé au web), sous un nom
+// aléatoire, puis supprimée dès que l'admin a vérifié.
+// ============================================================
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_FILES['piece_identite'])) {
+    $deja = $conn->query("SELECT COUNT(*) FROM verifications WHERE user_id = " . (int)$user_id . " AND statut = 'en_attente'")->fetch_row()[0];
+    $probleme = image_envoyee_valide($_FILES['piece_identite'], 8 * 1024 * 1024);
+    if ($user['verifie']) {
+        $erreur = "Ton compte est déjà vérifié.";
+    } elseif ($deja) {
+        $erreur = "Ta demande est déjà en cours de vérification.";
+    } elseif ($probleme) {
+        $erreur = $probleme;
+    } else {
+        $nom_fichier = bin2hex(random_bytes(16)) . '.img';
+        $chemin = __DIR__ . '/verifications/' . $nom_fichier;
+        if (move_uploaded_file($_FILES['piece_identite']['tmp_name'], $chemin)) {
+            $chemin = compresser_image($chemin, 1600, 85);
+            $nom_fichier = basename($chemin);
+            $stmt = $conn->prepare("INSERT INTO verifications (user_id, fichier) VALUES (?, ?)");
+            $stmt->bind_param("is", $user_id, $nom_fichier);
+            $stmt->execute();
+            $stmt->close();
+            $admins = $conn->query("SELECT email FROM users WHERE role = 'admin'");
+            while ($admin = $admins->fetch_assoc()) {
+                email_envoyer($admin['email'], 'Pièce d\'identité à vérifier - SafeGP', email_gabarit(
+                    'Demande de badge « vérifié »',
+                    '<p><strong>' . htmlspecialchars($user['nom']) . '</strong> (@' . htmlspecialchars($user['username'] ?? '') . ') a envoyé sa pièce d\'identité.</p>',
+                    'Vérifier dans le panel admin',
+                    url_site() . '/admin.php#verifications'
+                ));
+            }
+            $success = "Pièce envoyée : nous la vérifions et tu recevras un e-mail.";
+        } else {
+            $erreur = "L'envoi a échoué, réessaie.";
+        }
+    }
+}
+$stmt = $conn->prepare("SELECT * FROM verifications WHERE user_id = ? ORDER BY id DESC LIMIT 1");
+$stmt->bind_param("i", $user_id);
+$stmt->execute();
+$ma_verification = $stmt->get_result()->fetch_assoc();
+$stmt->close();
+
+// Alertes de trajets
+$stmt = $conn->prepare("SELECT * FROM alertes WHERE user_id = ? ORDER BY id DESC");
+$stmt->bind_param("i", $user_id);
+$stmt->execute();
+$mes_alertes = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+$stmt->close();
 
 // Abonnement : formule active + historique des demandes
 $quota = quota_publication($conn, $user_id);
@@ -370,6 +429,46 @@ $conn->close();
                 </tbody>
             </table>
             </div>
+        <?php endif; ?>
+
+        <!-- BADGE VÉRIFIÉ -->
+        <h3 id="verification" class="titre-section">Badge « GP vérifié »</h3>
+        <?php if ($user['verifie']): ?>
+            <p><?= badge_verifie(1) ?> Ton identité est vérifiée : le badge s'affiche sur ton profil et tes annonces.</p>
+        <?php elseif ($ma_verification && $ma_verification['statut'] === 'en_attente'): ?>
+            <p class="quota"><i class="fa-solid fa-hourglass-half"></i> Ta pièce d'identité est en cours de vérification (envoyée le <?= date('d/m/Y', strtotime($ma_verification['created_at'])) ?>).</p>
+        <?php else: ?>
+            <?php if ($ma_verification && $ma_verification['statut'] === 'refuse'): ?>
+                <p class="quota quota-atteint">Ta dernière demande a été refusée : <?= e($ma_verification['motif_refus']) ?></p>
+            <?php endif; ?>
+            <p class="aide-contact">Les expéditeurs font davantage confiance aux GP vérifiés. Envoie une photo lisible de ta carte d'identité ou de ton passeport :
+                elle n'est visible que par l'équipe SafeGP et elle est <strong>supprimée dès la vérification</strong>.</p>
+            <form action="mon_profil.php#verification" method="POST" enctype="multipart/form-data" class="form-verification">
+                <?= csrf_field() ?>
+                <input type="file" name="piece_identite" accept=".jpg,.jpeg,.png,.webp" required>
+                <button type="submit" class="btn-contact"><i class="fa-solid fa-id-card"></i> Envoyer ma pièce</button>
+            </form>
+        <?php endif; ?>
+
+        <!-- MES ALERTES -->
+        <h3 id="alertes" class="titre-section">Mes alertes de trajets</h3>
+        <?php if (($_GET['alerte'] ?? '') === 'supprimee'): ?><p class="success">Alerte supprimée.</p><?php endif; ?>
+        <?php if ($mes_alertes): ?>
+            <ul class="liste-alertes">
+                <?php foreach ($mes_alertes as $a): ?>
+                    <li>
+                        <a href="search_trajet.php?<?= e(http_build_query(array_filter(['pays_depart' => $a['pays_depart'], 'depart' => $a['depart'], 'pays_arrivee' => $a['pays_arrivee'], 'arrivee' => $a['arrivee']]))) ?>">
+                            <i class="fa-regular fa-bell"></i> <?= e(alerte_libelle($a)) ?>
+                        </a>
+                        <form action="alertes.php" method="POST" class="form-inline">
+                            <?= csrf_field() ?>
+                            <button type="submit" name="supprimer" value="<?= (int)$a['id'] ?>" class="btn-lien" title="Supprimer cette alerte"><i class="fa-solid fa-trash"></i></button>
+                        </form>
+                    </li>
+                <?php endforeach; ?>
+            </ul>
+        <?php else: ?>
+            <p class="texte-doux-bloc">Aucune alerte. Fais une recherche (pays ou ville), puis clique sur « Créer une alerte ».</p>
         <?php endif; ?>
 
         <!-- SÉCURITÉ DU COMPTE -->

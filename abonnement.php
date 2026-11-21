@@ -24,6 +24,13 @@ $numeros = array_filter([
 ]);
 $titulaire = defined('PAIEMENT_TITULAIRE') ? PAIEMENT_TITULAIRE : '';
 
+// Coordonnées bancaires (virement, surtout depuis l'étranger)
+$banque = [];
+foreach (['BANQUE_NOM' => 'Banque', 'BANQUE_IBAN' => 'IBAN', 'BANQUE_RIB' => 'RIB', 'BANQUE_SWIFT' => 'Code SWIFT / BIC'] as $const => $libelle) {
+    if (defined($const) && constant($const) !== '') $banque[$libelle] = constant($const);
+}
+$virement_possible = isset($banque['IBAN']) || isset($banque['RIB']);
+
 // Une seule demande en attente à la fois
 $stmt = $conn->prepare("SELECT * FROM abonnements WHERE user_id = ? AND statut = 'en_attente' ORDER BY id DESC LIMIT 1");
 $stmt->bind_param("i", $user_id);
@@ -125,7 +132,24 @@ $conn->close();
                 <?php endforeach; ?>
             </div>
             <?php if ($titulaire): ?><p class="aide-contact">Au nom de : <strong><?= e($titulaire) ?></strong></p><?php endif; ?>
-        <?php else: ?>
+        <?php endif; ?>
+
+        <?php if ($virement_possible): ?>
+            <details class="bloc-repliable virement">
+                <summary><i class="fa-solid fa-building-columns"></i> Payer par virement bancaire (depuis l'étranger)</summary>
+                <div class="coordonnees-banque">
+                    <?php if ($titulaire): ?><p><span>Titulaire</span><strong><?= e($titulaire) ?></strong></p><?php endif; ?>
+                    <?php foreach ($banque as $libelle => $valeur): ?>
+                        <p><span><?= e($libelle) ?></span><strong><?= e($valeur) ?></strong>
+                            <button type="button" class="btn-lien copier" data-copier="<?= e(preg_replace('/\s+/', '', $valeur)) ?>"><i class="fa-regular fa-copy"></i></button></p>
+                    <?php endforeach; ?>
+                    <p class="aide-contact">Montant à virer : <strong><?= e(prix_fcfa($montant)) ?></strong> (<?= e(equivalents_prix($montant)) ?>).
+                        Indique ton nom d'utilisateur SafeGP dans le motif du virement. Les frais bancaires sont à ta charge.</p>
+                </div>
+            </details>
+        <?php endif; ?>
+
+        <?php if (!$numeros && !$virement_possible): ?>
             <p class="quota quota-atteint">Les numéros de paiement ne sont pas encore configurés. <a href="retours.php?type=autre">Contacte-nous</a> pour t'abonner.</p>
         <?php endif; ?>
 
@@ -149,7 +173,7 @@ $conn->close();
             </div>
             <div class="form-group">
                 <label>Référence de la transaction</label>
-                <input type="text" name="reference" maxlength="100" required value="<?= e($_POST['reference'] ?? '') ?>" placeholder="Ex : T2411210945ABC (reçue par SMS)">
+                <input type="text" name="reference" maxlength="100" required value="<?= e($_POST['reference'] ?? '') ?>" placeholder="Ex : T2411210945ABC (SMS) ou référence du virement">
             </div>
             <div class="form-group">
                 <label>Numéro qui a payé <span class="facultatif">(facultatif, aide à retrouver le paiement)</span></label>

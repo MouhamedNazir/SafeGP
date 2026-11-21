@@ -3,6 +3,9 @@
 // (tout fonctionne aussi sans JavaScript, en plus simple)
 // ============================================================
 
+// Textes traduits (anglais) fournis par la page, sinon français
+const T = Object.assign({vu: 'Vu', copie: 'Copié', erreurEnvoi: "Le message n'a pas pu être envoyé : "}, window.SAFEGP_T || {});
+
 document.addEventListener('DOMContentLoaded', function () {
 
     // ---------- Numéros WhatsApp : ajouter / retirer une ligne ----------
@@ -112,7 +115,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const lus = Array.from(liste.querySelectorAll('.message.envoye'))
                 .filter(el => parseInt(el.dataset.id, 10) <= vuJusqua);
             if (lus.length) {
-                lus[lus.length - 1].insertAdjacentHTML('beforeend', '<span class="msg-vu"><i class="fa-solid fa-check-double"></i> Vu</span>');
+                lus[lus.length - 1].insertAdjacentHTML('beforeend', '<span class="msg-vu"><i class="fa-solid fa-check-double"></i> ' + T.vu + '</span>');
             }
         }
 
@@ -170,7 +173,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 await actualiser();
                 descendre();
             } catch (err) {
-                alert("Le message n'a pas pu être envoyé : " + err.message);
+                alert(T.erreurEnvoi + err.message);
             } finally {
                 envoiEnCours = false;
                 zone.focus();
@@ -205,7 +208,7 @@ document.addEventListener('DOMContentLoaded', function () {
             try {
                 await navigator.clipboard.writeText(bouton.dataset.copier);
                 const texte = bouton.innerHTML;
-                bouton.innerHTML = '<i class="fa-solid fa-check"></i> Copié';
+                bouton.innerHTML = '<i class="fa-solid fa-check"></i> ' + T.copie;
                 setTimeout(function () { bouton.innerHTML = texte; }, 1500);
             } catch (e) { /* presse-papiers indisponible : le numéro reste affiché */ }
         });
@@ -219,6 +222,15 @@ document.addEventListener('DOMContentLoaded', function () {
             repli.open = true;
             cible.scrollIntoView({block: 'start'});
         }
+    }
+
+    // ---------- Partage natif (menu « Partager » du téléphone) ----------
+    const natif = document.querySelector('.partage-natif');
+    if (natif && navigator.share) {
+        natif.hidden = false;
+        natif.addEventListener('click', function () {
+            navigator.share({title: natif.dataset.titre, text: natif.dataset.texte, url: natif.dataset.lien}).catch(function () {});
+        });
     }
 });
 

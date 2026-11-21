@@ -8,6 +8,11 @@
     </div>
 
     <div class="nav-actions">
+    <!-- Langue : FR / EN -->
+    <a href="<?= lien_langue(LANGUE === 'fr' ? 'en' : 'fr') ?>" class="nav-langue" title="<?= LANGUE === 'fr' ? 'English' : 'Français' ?>" hreflang="<?= LANGUE === 'fr' ? 'en' : 'fr' ?>">
+        <?= LANGUE === 'fr' ? 'EN' : 'FR' ?>
+    </a>
+
     <!-- Bascule thème clair / sombre -->
     <button type="button" class="nav-theme" aria-label="Changer de thème" title="Thème clair / sombre">
         <i class="fa-solid fa-sun icone-clair"></i>

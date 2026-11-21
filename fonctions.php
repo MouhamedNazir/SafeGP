@@ -309,7 +309,7 @@ const TAUX_FCFA = [
     'MAD' => 60,
 ];
 
-const MOYENS_PAIEMENT = ['wave' => 'Wave', 'orange_money' => 'Orange Money', 'autre' => 'Autre'];
+const MOYENS_PAIEMENT = ['wave' => 'Wave', 'orange_money' => 'Orange Money', 'virement' => 'Virement bancaire', 'autre' => 'Autre'];
 
 function prix_fcfa(int $montant): string
 {
@@ -533,7 +533,7 @@ function trajet_resume(array $t): array
         'pays'  => [strtolower((string)$t['pays_depart']), strtolower((string)$t['pays_arrivee'])],
         'date'  => date('d/m/Y', strtotime($t['date_depart'])),
         'prix'  => prix_kilo_fr($t['prix_kilo'], $t['devise'] ?? 'MAD'),
-        'lien'  => 'profil.php?id=' . (int)$t['user_id'] . '#trajet-' . (int)$t['id'],
+        'lien'  => 'trajet.php?id=' . (int)$t['id'],
     ];
 }
 
@@ -546,7 +546,7 @@ function message_affichage(array $m, int $moi): array
         'moi'     => (int)$m['expediteur_id'] === $moi,
         'contenu' => $m['contenu'],
         'heure'   => date('H:i', strtotime($m['created_at'])),
-        'jour'    => libelle_jour($m['created_at']),
+        'jour'    => t(libelle_jour($m['created_at'])),
         'lu'      => (bool)$m['lu'],
         'trajet'  => !empty($m['t_id']) ? trajet_resume([
             'id' => $m['t_id'], 'depart' => $m['t_depart'], 'arrivee' => $m['t_arrivee'],
@@ -667,4 +667,192 @@ function avatar(?string $nom, ?string $photo, string $classe = ''): string
         return '<img src="uploads/' . e($photo) . '?v=' . filemtime(__DIR__ . '/uploads/' . $photo) . '" alt="" class="' . e($classe) . '">';
     }
     return e(strtoupper(mb_substr((string)$nom, 0, 1)) ?: '?');
+}
+
+// ============================================================
+// AVIS SUR LES GP
+// Pour éviter les faux avis, on ne peut noter qu'un GP avec qui
+// on a vraiment échangé (messages dans les deux sens).
+// ============================================================
+function peut_noter(mysqli $conn, int $auteur, int $gp): bool
+{
+    if ($auteur === $gp || !$auteur) return false;
+    $stmt = $conn->prepare("SELECT
+        EXISTS(SELECT 1 FROM messages WHERE expediteur_id = ? AND destinataire_id = ?) AND
+        EXISTS(SELECT 1 FROM messages WHERE expediteur_id = ? AND destinataire_id = ?)");
+    $stmt->bind_param("iiii", $auteur, $gp, $gp, $auteur);
+    $stmt->execute();
+    $ok = (bool)$stmt->get_result()->fetch_row()[0];
+    $stmt->close();
+    return $ok;
+}
+
+// [user_id => ['moyenne' => 4.5, 'nombre' => 12]] pour une liste de membres
+function avis_stats(mysqli $conn, array $user_ids): array
+{
+    $ids = array_unique(array_filter(array_map('intval', $user_ids)));
+    if (!$ids) return [];
+    $res = $conn->query("SELECT gp_id, AVG(note) AS moyenne, COUNT(*) AS nombre FROM avis WHERE gp_id IN (" . implode(',', $ids) . ") GROUP BY gp_id");
+    $stats = [];
+    while ($l = $res->fetch_assoc()) {
+        $stats[$l['gp_id']] = ['moyenne' => round((float)$l['moyenne'], 1), 'nombre' => (int)$l['nombre']];
+    }
+    return $stats;
+}
+
+// Étoiles pleines / demi / vides pour une note de 0 à 5
+function etoiles(float $note): string
+{
+    $html = '<span class="etoiles" aria-label="' . str_replace('.', ',', (string)$note) . ' sur 5">';
+    for ($i = 1; $i <= 5; $i++) {
+        if ($note >= $i) $html .= '<i class="fa-solid fa-star"></i>';
+        elseif ($note >= $i - 0.5) $html .= '<i class="fa-solid fa-star-half-stroke"></i>';
+        else $html .= '<i class="fa-regular fa-star"></i>';
+    }
+    return $html . '</span>';
+}
+
+// Petit résumé « ★★★★☆ 4,3 (12 avis) » ; vide s'il n'y a pas d'avis
+function resume_avis(?array $stat): string
+{
+    if (!$stat || !$stat['nombre']) return '';
+    return '<span class="resume-avis">' . etoiles($stat['moyenne']) . ' <strong>'
+        . str_replace('.', ',', (string)$stat['moyenne']) . '</strong> <small>(' . $stat['nombre'] . ' avis)</small></span>';
+}
+
+// Badge « GP vérifié » (identité contrôlée par l'équipe)
+function badge_verifie($verifie): string
+{
+    return $verifie ? '<span class="badge-verifie" title="Identité vérifiée par l\'équipe SafeGP"><i class="fa-solid fa-circle-check"></i> Vérifié</span>' : '';
+}
+
+// ============================================================
+// ALERTES DE TRAJETS
+// ============================================================
+const ALERTES_MAX = 10;
+
+// Libellé lisible d'une alerte : « Paris (France) → Sénégal »
+function alerte_libelle(array $a): string
+{
+    $lieu = function ($ville, $pays) {
+        if ($ville && $pays) return $ville . ' (' . nom_pays($pays) . ')';
+        return $ville ?: ($pays ? nom_pays($pays) : 'Partout');
+    };
+    return $lieu($a['depart'], $a['pays_depart']) . ' → ' . $lieu($a['arrivee'], $a['pays_arrivee']);
+}
+
+// Après la publication d'un trajet : e-mail aux membres dont une alerte correspond
+// (un seul e-mail par membre, jamais à l'auteur du trajet)
+function alertes_notifier(mysqli $conn, int $trajet_id): int
+{
+    $stmt = $conn->prepare("
+        SELECT DISTINCT u.id, u.nom, u.email, t.depart, t.arrivee, t.pays_depart, t.pays_arrivee,
+               t.date_depart, t.prix_kilo, t.devise
+        FROM trajets t
+        JOIN alertes a ON (a.pays_depart IS NULL OR a.pays_depart = t.pays_depart)
+                      AND (a.pays_arrivee IS NULL OR a.pays_arrivee = t.pays_arrivee)
+                      AND (a.depart IS NULL OR t.depart LIKE CONCAT('%', a.depart, '%'))
+                      AND (a.arrivee IS NULL OR t.arrivee LIKE CONCAT('%', a.arrivee, '%'))
+        JOIN users u ON u.id = a.user_id
+        WHERE t.id = ? AND a.user_id <> t.user_id AND u.email_verifie = 1");
+    $stmt->bind_param("i", $trajet_id);
+    $stmt->execute();
+    $destinataires = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+
+    $vus = [];
+    foreach ($destinataires as $d) {
+        if (isset($vus[$d['id']])) continue;
+        $vus[$d['id']] = true;
+        $titre = $d['depart'] . ' → ' . $d['arrivee'];
+        email_envoyer($d['email'], 'Nouveau trajet : ' . $titre . ' - SafeGP', email_gabarit(
+            'Un trajet correspond à ton alerte',
+            '<p>Bonjour ' . htmlspecialchars($d['nom']) . ',</p><p>Un GP vient de publier <strong>' . htmlspecialchars($titre)
+            . '</strong> (' . htmlspecialchars(nom_pays($d['pays_depart']) . ' → ' . nom_pays($d['pays_arrivee'])) . '), départ le <strong>'
+            . date('d/m/Y', strtotime($d['date_depart'])) . '</strong>, ' . htmlspecialchars(prix_kilo_fr($d['prix_kilo'], $d['devise'])) . '.</p>'
+            . '<p style="font-size:12px;color:#64748b;">Tu peux gérer tes alertes dans « Mon profil ».</p>',
+            'Voir le trajet',
+            url_site() . '/trajet.php?id=' . $trajet_id
+        ));
+    }
+    return count($vus);
+}
+
+// ============================================================
+// IMAGES : redimensionnement + compression (si l'extension GD existe)
+// Sans GD, l'image est gardée telle quelle.
+// Renvoie le chemin final (l'extension peut devenir .jpg).
+// ============================================================
+function compresser_image(string $chemin, int $cote_max, int $qualite = 82): string
+{
+    if (!function_exists('imagecreatefromstring') || !is_file($chemin)) return $chemin;
+    $infos = @getimagesize($chemin);
+    $source = $infos ? @imagecreatefromstring(file_get_contents($chemin)) : false;
+    if (!$source) return $chemin;
+
+    [$l, $h] = $infos;
+    $ratio = min(1, $cote_max / max($l, $h));
+    $nl = max(1, (int)round($l * $ratio));
+    $nh = max(1, (int)round($h * $ratio));
+
+    // Fond blanc (les PNG transparents deviennent des JPEG)
+    $image = imagecreatetruecolor($nl, $nh);
+    imagefill($image, 0, 0, imagecolorallocate($image, 255, 255, 255));
+    imagecopyresampled($image, $source, 0, 0, 0, 0, $nl, $nh, $l, $h);
+
+    // Photos de téléphone : respecter l'orientation enregistrée (EXIF)
+    if (function_exists('exif_read_data') && ($infos[2] ?? 0) === IMAGETYPE_JPEG) {
+        $exif = @exif_read_data($chemin);
+        $rotation = [3 => 180, 6 => -90, 8 => 90][$exif['Orientation'] ?? 1] ?? 0;
+        if ($rotation) $image = imagerotate($image, $rotation, 0);
+    }
+
+    $destination = preg_replace('/\.[a-z0-9]+$/i', '', $chemin) . '.jpg';
+    $ok = imagejpeg($image, $destination, $qualite);
+    imagedestroy($image);
+    imagedestroy($source);
+    if (!$ok) return $chemin;
+    if ($destination !== $chemin) @unlink($chemin);
+    return $destination;
+}
+
+// Vérifie qu'un fichier envoyé est bien une image (JPEG, PNG, WEBP) de taille raisonnable
+function image_envoyee_valide(array $fichier, int $taille_max): string
+{
+    if (($fichier['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) return "Le fichier n'a pas pu être envoyé.";
+    if ($fichier['size'] > $taille_max) return "Le fichier dépasse " . round($taille_max / 1048576) . " Mo.";
+    $mime = (new finfo(FILEINFO_MIME_TYPE))->file($fichier['tmp_name']);
+    if (!in_array($mime, ['image/jpeg', 'image/png', 'image/webp'], true) || @getimagesize($fichier['tmp_name']) === false) {
+        return "Le fichier doit être une photo (JPG, PNG ou WEBP).";
+    }
+    return "";
+}
+
+// ============================================================
+// PAGINATION (panel admin)
+// ============================================================
+const PAR_PAGE = 25;
+
+// Liens « ‹ 1 2 3 › » ; $param = nom du paramètre de page dans l'URL
+function pagination(int $total, int $page, string $param, string $ancre = ''): string
+{
+    $nb_pages = (int)ceil($total / PAR_PAGE);
+    if ($nb_pages <= 1) return '';
+    $lien = function ($p) use ($param, $ancre) {
+        $q = $_GET;
+        $q[$param] = $p;
+        return '?' . htmlspecialchars(http_build_query($q)) . $ancre;
+    };
+    $html = '<nav class="pagination" aria-label="Pages">';
+    if ($page > 1) $html .= '<a href="' . $lien($page - 1) . '" aria-label="Page précédente">‹</a>';
+    for ($p = 1; $p <= $nb_pages; $p++) {
+        // On affiche la première, la dernière et les pages proches de la page courante
+        if ($p === 1 || $p === $nb_pages || abs($p - $page) <= 2) {
+            $html .= $p === $page ? '<span class="actif">' . $p . '</span>' : '<a href="' . $lien($p) . '">' . $p . '</a>';
+        } elseif (abs($p - $page) === 3) {
+            $html .= '<span class="points">…</span>';
+        }
+    }
+    if ($page < $nb_pages) $html .= '<a href="' . $lien($page + 1) . '" aria-label="Page suivante">›</a>';
+    return $html . '</nav>';
 }

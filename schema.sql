@@ -21,6 +21,8 @@ CREATE TABLE `users` (
   `abonnement_fin` date DEFAULT NULL,
   `rappel_abonnement` date DEFAULT NULL,
   `disponible` tinyint(1) NOT NULL DEFAULT 1,
+  `verifie` tinyint(1) NOT NULL DEFAULT 0,
+  `langue` char(2) NOT NULL DEFAULT 'fr',
   `joignable_debut` time DEFAULT NULL,
   `joignable_fin` time DEFAULT NULL,
   `whatsapp` varchar(20) DEFAULT NULL,
@@ -126,7 +128,7 @@ CREATE TABLE `abonnements` (
   `formule` enum('standard','illimite') NOT NULL,
   `duree` enum('mois','an') NOT NULL,
   `montant` int(11) NOT NULL,
-  `moyen` enum('wave','orange_money','autre') NOT NULL,
+  `moyen` enum('wave','orange_money','virement','autre') NOT NULL,
   `reference` varchar(100) NOT NULL,
   `telephone` varchar(20) DEFAULT NULL,
   `statut` enum('en_attente','valide','refuse') NOT NULL DEFAULT 'en_attente',
@@ -148,6 +150,45 @@ CREATE TABLE `connexions_echouees` (
   PRIMARY KEY (`id`),
   KEY `ip_email` (`ip`,`email`),
   KEY `created_at` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+CREATE TABLE `avis` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `gp_id` int(11) NOT NULL,
+  `auteur_id` int(11) NOT NULL,
+  `note` tinyint(1) NOT NULL,
+  `commentaire` text DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `un_avis_par_auteur` (`gp_id`,`auteur_id`),
+  KEY `auteur_id` (`auteur_id`),
+  CONSTRAINT `avis_auteur_fk` FOREIGN KEY (`auteur_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `avis_gp_fk` FOREIGN KEY (`gp_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+CREATE TABLE `alertes` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `user_id` int(11) NOT NULL,
+  `pays_depart` char(2) DEFAULT NULL,
+  `depart` varchar(100) DEFAULT NULL,
+  `pays_arrivee` char(2) DEFAULT NULL,
+  `arrivee` varchar(100) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `user_id` (`user_id`),
+  CONSTRAINT `alertes_user_fk` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+CREATE TABLE `verifications` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `user_id` int(11) NOT NULL,
+  `fichier` varchar(100) DEFAULT NULL,
+  `statut` enum('en_attente','valide','refuse') NOT NULL DEFAULT 'en_attente',
+  `motif_refus` varchar(255) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `traite_le` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `user_id` (`user_id`),
+  KEY `statut` (`statut`),
+  CONSTRAINT `verifications_user_fk` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 SET FOREIGN_KEY_CHECKS = 1;
