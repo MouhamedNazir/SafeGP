@@ -199,6 +199,12 @@ CREATE TABLE `envois` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `code` char(9) NOT NULL,
   `trajet_id` int(11) DEFAULT NULL,
+  `depart` varchar(100) DEFAULT NULL,
+  `pays_depart` char(2) DEFAULT NULL,
+  `arrivee` varchar(100) DEFAULT NULL,
+  `pays_arrivee` char(2) DEFAULT NULL,
+  `date_depart` date DEFAULT NULL,
+  `date_arrivee` date DEFAULT NULL,
   `gp_id` int(11) NOT NULL,
   `expediteur_id` int(11) NOT NULL,
   `kilos` decimal(6,1) NOT NULL,
@@ -230,6 +236,15 @@ CREATE TABLE `envois_etapes` (
   PRIMARY KEY (`id`),
   KEY `envoi_id` (`envoi_id`),
   CONSTRAINT `etapes_envoi_fk` FOREIGN KEY (`envoi_id`) REFERENCES `envois` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+CREATE TABLE `publications` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `user_id` int(11) NOT NULL,
+  `trajet_id` int(11) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `user_date` (`user_id`,`created_at`),
+  CONSTRAINT `publications_user_fk` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 SET FOREIGN_KEY_CHECKS = 1;

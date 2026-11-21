@@ -20,7 +20,8 @@ define('FORCER_HTTPS', false);
 // true seulement pour déboguer en ligne : affiche les erreurs PHP aux visiteurs
 define('MODE_DEBUG', false);
 
-// Adresse publique du site, utilisée dans les liens des e-mails
+// Adresse publique du site, utilisée dans les liens des e-mails.
+// OBLIGATOIRE en ligne : sans elle, aucun e-mail n'est envoyé (sécurité)
 define('SITE_URL', 'https://safegp.free.nf');
 
 // ---------- E-mails (SMTP) ----------

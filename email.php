@@ -11,9 +11,19 @@
 // enregistré dans logs/emails/ pour pouvoir cliquer sur les liens.
 // ============================================================
 
+// En ligne, SITE_URL est obligatoire : sans lui, les liens des e-mails
+// (mot de passe oublié...) seraient construits avec l'en-tête Host
+// envoyé par le visiteur, qui peut être falsifié. On n'envoie donc rien.
 function smtp_configure(): bool
 {
-    return defined('SMTP_HOTE') && SMTP_HOTE !== '';
+    if (!defined('SMTP_HOTE') || SMTP_HOTE === '') return false;
+    if (!est_en_local() && (!defined('SITE_URL') || SITE_URL === '')) {
+        static $signale = false;
+        if (!$signale) error_log('[SafeGP] SITE_URL manquant dans config.php : envoi des e-mails désactivé.');
+        $signale = true;
+        return false;
+    }
+    return true;
 }
 
 // Peut-on « envoyer » des e-mails ? (SMTP configuré, ou mode local)

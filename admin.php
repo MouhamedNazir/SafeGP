@@ -206,7 +206,7 @@ $stmt->close();
 $decalage_u = ($pu - 1) * PAR_PAGE;
 $stmt = $conn->prepare("
     SELECT users.*,
-           (SELECT COUNT(*) FROM trajets WHERE trajets.user_id = users.id AND trajets.created_at >= '$debut_mois') AS publications_mois
+           (SELECT COUNT(*) FROM publications WHERE publications.user_id = users.id AND publications.created_at >= '$debut_mois') AS publications_mois
     FROM users $filtre_u ORDER BY created_at DESC LIMIT " . PAR_PAGE . " OFFSET " . $decalage_u);
 if ($qu !== '') { $stmt->bind_param("sss", $m, $m, $m); }
 $stmt->execute();
@@ -287,7 +287,7 @@ $conn->close();
         </p>
     <?php endif; ?>
     <?php if (isset($_GET['erreur']) && $_GET['erreur'] == 'suppression'): ?>
-        <p class="erreur"><i class="fa-solid fa-circle-xmark"></i> Impossible de supprimer cet utilisateur.</p>
+        <p class="erreur"><i class="fa-solid fa-circle-xmark"></i> Impossible de supprimer cet utilisateur (il a peut-être des colis en cours).</p>
     <?php endif; ?>
 
     <!-- STATISTIQUES -->

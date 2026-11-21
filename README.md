@@ -131,7 +131,7 @@ Plateforme web de mise en relation entre **GP** (voyageurs qui ont de la place d
    git clone https://github.com/MouhamedNazir/SafeGP.git
    ```
 2. Créer une base MySQL `safegp` (utf8mb4) et y importer `schema.sql`.
-   - **Base déjà existante** : appliquer à la place les fichiers de `migrations/` dans l'ordre (001 à 006), une seule fois chacun.
+   - **Base déjà existante** : appliquer à la place les fichiers de `migrations/` dans l'ordre (001 à 007), une seule fois chacun.
 3. Copier `config.example.php` en `config.php` et renseigner les identifiants de la base.
 4. Lancer le projet sur un serveur local (XAMPP, WAMP…) et ouvrir `index.php`.
 5. Pour devenir administrateur après inscription :

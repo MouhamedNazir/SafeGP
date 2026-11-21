@@ -35,9 +35,15 @@ require_once __DIR__ . '/fonctions.php';
 require_once __DIR__ . '/email.php';
 
 // Une fois par jour : petites tâches de ménage (voir taches_quotidiennes())
+// Repère du jour : un fichier dans logs/ ; si le dossier n'est pas accessible
+// en écriture, la session sert de repère (au pire une fois par visiteur et par jour)
 $drapeau_maj = __DIR__ . '/logs/maj_quotidienne.txt';
-if (@file_get_contents($drapeau_maj) !== date('Y-m-d')) {
-    @file_put_contents($drapeau_maj, date('Y-m-d'));
+$aujourdhui_maj = date('Y-m-d');
+if (@file_get_contents($drapeau_maj) !== $aujourdhui_maj && ($_SESSION['taches_quotidiennes'] ?? '') !== $aujourdhui_maj) {
+    if (@file_put_contents($drapeau_maj, $aujourdhui_maj) === false) {
+        error_log('[SafeGP] logs/ non accessible en écriture : repère quotidien gardé en session.');
+    }
+    $_SESSION['taches_quotidiennes'] = $aujourdhui_maj;
     taches_quotidiennes($conn);
 }
 csrf_verify(); // bloque tout POST sans jeton CSRF valide

@@ -45,6 +45,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
         if ($stmt->execute()) {
             $trajet_id = $stmt->insert_id;
+            // Compté dans la limite du mois, même si le trajet est supprimé ensuite
+            $conn->query("INSERT INTO publications (user_id, trajet_id) VALUES (" . (int)$user_id . ", " . (int)$trajet_id . ")");
             if ($t['pour_autrui']) {
                 contacts_enregistrer($conn, $user_id, $trajet_id, $contacts_valeurs);
             }

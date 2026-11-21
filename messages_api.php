@@ -43,4 +43,4 @@ if ($action === 'envoyer' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     repondre(['ok' => true, 'id' => $resultat]);
 }
 
-repondre(['erreur' => 'Action inconnue'], 400);
+repondre(['erreur' => t('Action inconnue')], 400);

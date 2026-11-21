@@ -10,7 +10,7 @@ $moi = (int)$_SESSION['user_id'];
 $code = strtoupper(trim($_GET['code'] ?? ''));
 
 $stmt = $conn->prepare("
-    SELECT e.*, t.depart, t.arrivee, t.pays_depart, t.pays_arrivee, t.date_depart, t.date_arrivee, t.point_depot, t.point_reception,
+    SELECT e.*, t.point_depot, t.point_reception,
            g.nom AS gp_nom, g.username AS gp_username, g.verifie AS gp_verifie, x.nom AS exp_nom, x.username AS exp_username,
            (SELECT created_at FROM envois_etapes WHERE envoi_id = e.id AND statut = 'depose' ORDER BY id LIMIT 1) AS depose_le,
            (SELECT note FROM envois_etapes WHERE envoi_id = e.id AND statut = 'depose' ORDER BY id LIMIT 1) AS note_depot

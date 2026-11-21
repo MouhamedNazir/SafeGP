@@ -8,14 +8,13 @@ exiger_connexion();
 $moi = (int)$_SESSION['user_id'];
 
 $requete = "
-    SELECT e.*, t.depart, t.arrivee, t.pays_depart, t.pays_arrivee, t.date_depart,
+    SELECT e.*,
            g.nom AS gp_nom, g.username AS gp_username, x.nom AS exp_nom, x.username AS exp_username
     FROM envois e
-    LEFT JOIN trajets t ON t.id = e.trajet_id
     JOIN users g ON g.id = e.gp_id
     JOIN users x ON x.id = e.expediteur_id
     WHERE e.%s = ?
-    ORDER BY (e.statut = 'demande') DESC, FIELD(e.statut, 'refuse', 'annule', 'remis') ASC, t.date_depart ASC, e.id DESC";
+    ORDER BY (e.statut = 'demande') DESC, FIELD(e.statut, 'refuse', 'annule', 'remis') ASC, e.date_depart ASC, e.id DESC";
 
 $listes = [];
 foreach (['gp_id' => 'transporte', 'expediteur_id' => 'envoye'] as $colonne => $cle) {

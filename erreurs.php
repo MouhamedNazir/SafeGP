@@ -7,10 +7,16 @@
 // logs/erreurs.log et le visiteur voit une page « Oups » propre.
 // ============================================================
 
+// « Local » = l'adresse demandée est locale ET la requête vient vraiment
+// de cet ordinateur (REMOTE_ADDR). L'en-tête Host seul pouvant être
+// falsifié par un visiteur, il ne suffit jamais.
 function est_en_local(): bool
 {
-    $hote = strtolower(explode(':', $_SERVER['HTTP_HOST'] ?? 'localhost')[0]);
-    return in_array($hote, ['localhost', '127.0.0.1', '::1', '[::1]'], true) || PHP_SAPI === 'cli';
+    if (PHP_SAPI === 'cli') return true;
+    $boucle = ['127.0.0.1', '::1', 'localhost', '[::1]'];
+    $hote = strtolower(explode(':', $_SERVER['HTTP_HOST'] ?? '')[0]);
+    if (str_starts_with($_SERVER['HTTP_HOST'] ?? '', '[::1]')) $hote = '[::1]';
+    return in_array($hote, $boucle, true) && in_array($_SERVER['REMOTE_ADDR'] ?? '', ['127.0.0.1', '::1'], true);
 }
 
 function est_en_https(): bool

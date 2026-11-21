@@ -95,6 +95,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['supprimer_compte'])) {
         $erreur = "Mot de passe incorrect : ton compte n'a pas été supprimé.";
     } elseif (empty($_POST['confirmer_suppression'])) {
         $erreur = "Coche la case pour confirmer la suppression.";
+    } elseif (envois_en_cours_utilisateur($conn, $user_id) > 0) {
+        $erreur = "Tu as des colis en cours (acceptés, déposés ou en route) : termine ou annule ces envois avant de supprimer ton compte.";
     } elseif ($user['role'] === 'admin' && $nb_admins <= 1) {
         $erreur = "Tu es le seul administrateur : nomme un autre admin avant de supprimer ton compte.";
     } elseif (supprimer_utilisateur($conn, $user_id)) {

@@ -116,7 +116,7 @@ function avatar_conv(array $u): string
                             <span class="conv-heure"><?= e(heure_conversation($conv['date_dernier'])) ?></span>
                         </div>
                         <div class="conv-ligne2">
-                            <span class="conv-apercu"><?= (int)$conv['dernier_de'] === $user_id ? 'Toi : ' : '' ?><?= e(mb_strimwidth($conv['dernier'], 0, 60, '…')) ?></span>
+                            <span class="conv-apercu"><?php if ((int)$conv['dernier_de'] === $user_id): ?><span class="conv-moi">Toi :</span> <?php endif; ?><?= e(mb_strimwidth($conv['dernier'], 0, 60, '…')) ?></span>
                             <?php if ($conv['non_lus'] > 0): ?>
                                 <span class="badge-nonlu"><?= (int)$conv['non_lus'] ?></span>
                             <?php endif; ?>

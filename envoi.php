@@ -12,11 +12,17 @@ $code = strtoupper(trim($_GET['code'] ?? ''));
 $erreur = "";
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $photo = null;
-    if (!empty($_FILES['photo']['name'])) {
+    $nouveau = (string)($_POST['statut'] ?? '');
+    // On vérifie les droits AVANT d'enregistrer la photo (pas de fichier orphelin)
+    if (!envoi_action_permise($conn, $code, $moi, $nouveau)) {
+        $erreur = "Cette action n'est pas possible pour cet envoi.";
+    } elseif (!empty($_FILES['photo']['name']) && in_array($nouveau, ['depose', 'remis'], true)) {
         $photo = enregistrer_fichier_prive($_FILES['photo'], $erreur);
     }
     if (!$erreur) {
-        $erreur = envoi_changer_statut($conn, $code, $moi, (string)($_POST['statut'] ?? ''), $_POST['note'] ?? null, $photo);
+        $erreur = envoi_changer_statut($conn, $code, $moi, $nouveau, $_POST['note'] ?? null, $photo);
+        // Échec : la photo déjà enregistrée ne doit pas rester sur le disque
+        if ($erreur && $photo) @unlink(__DIR__ . '/preuves/' . $photo);
     }
     if (!$erreur) {
         header("Location: envoi.php?code=" . urlencode($code) . "&maj=1");
@@ -25,7 +31,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $stmt = $conn->prepare("
-    SELECT e.*, t.depart, t.arrivee, t.pays_depart, t.pays_arrivee, t.date_depart, t.date_arrivee, t.point_depot, t.point_reception,
+    SELECT e.*, t.point_depot, t.point_reception,
            g.nom AS gp_nom, g.username AS gp_username, x.nom AS exp_nom, x.username AS exp_username
     FROM envois e
     LEFT JOIN trajets t ON t.id = e.trajet_id

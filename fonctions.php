@@ -349,7 +349,8 @@ function quota_publication(mysqli $conn, int $user_id): array
     $stmt->close();
 
     $debut_mois = date('Y-m-01 00:00:00');
-    $stmt = $conn->prepare("SELECT COUNT(*) AS n FROM trajets WHERE user_id = ? AND created_at >= ?");
+    // Journal des publications : supprimer un trajet ne rend pas la publication
+    $stmt = $conn->prepare("SELECT COUNT(*) AS n FROM publications WHERE user_id = ? AND created_at >= ?");
     $stmt->bind_param("is", $user_id, $debut_mois);
     $stmt->execute();
     $utilisees = (int)$stmt->get_result()->fetch_assoc()['n'];
@@ -478,6 +479,8 @@ function supprimer_utilisateur(mysqli $conn, int $id): bool
     $u = $stmt->get_result()->fetch_assoc();
     $stmt->close();
     if (!$u) return false;
+    // Protection : jamais de suppression pendant qu'un colis est en cours
+    if (envois_en_cours_utilisateur($conn, $id) > 0) return false;
 
     // Fichiers privés liés au compte (preuves de paiement, photos des colis,
     // pièce d'identité en attente) : supprimés avec lui
@@ -977,7 +980,10 @@ function taches_quotidiennes(mysqli $conn): void
     // 2. Comptes jamais confirmés depuis 7 jours → supprimés
     //    (seulement quand les e-mails partent vraiment, sinon personne ne pourrait confirmer)
     if (function_exists('smtp_configure') && smtp_configure()) {
-        $res = $conn->query("SELECT id FROM users WHERE email_verifie = 0 AND role = 'user' AND created_at < NOW() - INTERVAL 7 DAY");
+        // Seulement les comptes qui ont VRAIMENT reçu un lien de confirmation
+        // il y a plus de 7 jours (pas ceux inscrits avant la mise en place du SMTP)
+        $res = $conn->query("SELECT u.id FROM users u WHERE u.email_verifie = 0 AND u.role = 'user'
+            AND EXISTS (SELECT 1 FROM jetons j WHERE j.user_id = u.id AND j.type = 'verification' AND j.created_at < NOW() - INTERVAL 7 DAY)");
         while ($u = $res->fetch_row()) supprimer_utilisateur($conn, (int)$u[0]);
     }
 
@@ -1027,7 +1033,7 @@ function abonnement_annulation_impossible(mysqli $conn, array $a): string
     if (strtotime($a['traite_le']) < time() - ANNULATION_HEURES * 3600) {
         return "Le délai d'annulation de 48 heures est dépassé.";
     }
-    $stmt = $conn->prepare("SELECT COUNT(*) FROM trajets WHERE user_id = ? AND created_at >= ?");
+    $stmt = $conn->prepare("SELECT COUNT(*) FROM publications WHERE user_id = ? AND created_at >= ?");
     $stmt->bind_param("is", $a['user_id'], $a['traite_le']);
     $stmt->execute();
     $publies = (int)$stmt->get_result()->fetch_row()[0];
@@ -1181,9 +1187,12 @@ function envoi_reserver(mysqli $conn, int $expediteur_id, int $trajet_id, array 
     $prix = round($kilos * (float)$t['prix_kilo'], 2);
     $contenu = mb_substr($contenu, 0, 255);
     $dest_nom = mb_substr($dest_nom, 0, 100);
-    $stmt = $conn->prepare("INSERT INTO envois (code, trajet_id, gp_id, expediteur_id, kilos, prix_total, devise, contenu, destinataire_nom, destinataire_tel)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-    $stmt->bind_param("siiiddssss", $code, $trajet_id, $t['user_id'], $expediteur_id, $kilos, $prix, $t['devise'], $contenu, $dest_nom, $dest_tel);
+    // La route est copiée dans l'envoi : le suivi la garde même si le trajet est supprimé
+    $stmt = $conn->prepare("INSERT INTO envois (code, trajet_id, depart, pays_depart, arrivee, pays_arrivee, date_depart, date_arrivee,
+            gp_id, expediteur_id, kilos, prix_total, devise, contenu, destinataire_nom, destinataire_tel)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    $stmt->bind_param("sissssssiiddssss", $code, $trajet_id, $t['depart'], $t['pays_depart'], $t['arrivee'], $t['pays_arrivee'],
+        $t['date_depart'], $t['date_arrivee'], $t['user_id'], $expediteur_id, $kilos, $prix, $t['devise'], $contenu, $dest_nom, $dest_tel);
     $stmt->execute();
     $envoi_id = $stmt->insert_id;
     $stmt->close();
@@ -1208,10 +1217,24 @@ function envoi_ajouter_etape(mysqli $conn, int $envoi_id, string $statut, ?strin
     $stmt->close();
 }
 
+// L'utilisateur peut-il faire passer cet envoi à ce statut ? (sans rien modifier)
+function envoi_action_permise(mysqli $conn, string $code, int $moi, string $nouveau): bool
+{
+    $stmt = $conn->prepare("SELECT statut, gp_id, expediteur_id FROM envois WHERE code = ?");
+    $stmt->bind_param("s", $code);
+    $stmt->execute();
+    $e = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    if (!$e) return false;
+    $permis = array_merge((int)$e['gp_id'] === $moi ? (TRANSITIONS_GP[$e['statut']] ?? []) : [],
+        (int)$e['expediteur_id'] === $moi ? (TRANSITIONS_EXPEDITEUR[$e['statut']] ?? []) : []);
+    return in_array($nouveau, $permis, true);
+}
+
 // Faire avancer un envoi. Renvoie "" si c'est fait, sinon le message d'erreur.
 function envoi_changer_statut(mysqli $conn, string $code, int $moi, string $nouveau, ?string $note, ?string $photo): string
 {
-    $stmt = $conn->prepare("SELECT e.*, t.kilos_total, t.kilos_restants, t.depart, t.arrivee,
+    $stmt = $conn->prepare("SELECT e.*, t.kilos_total, t.kilos_restants,
             g.nom AS gp_nom, g.email AS gp_email, x.nom AS exp_nom, x.email AS exp_email
         FROM envois e
         LEFT JOIN trajets t ON t.id = e.trajet_id
@@ -1271,4 +1294,21 @@ function envoi_frise(array $etapes): array
     $frise = [];
     foreach (ETAPES_ENVOI as $s) $frise[$s] = $dates[$s] ?? null;
     return $frise;
+}
+
+// Envois en cours (réservation acceptée, colis déposé, en route, arrivé) :
+// tant qu'il y en a, ni le compte ni le trajet ne peuvent être supprimés,
+// sinon l'autre personne perdrait le suivi et le reçu de son colis.
+const STATUTS_ENVOI_EN_COURS = "'accepte', 'depose', 'en_route', 'arrive'";
+
+function envois_en_cours_utilisateur(mysqli $conn, int $user_id): int
+{
+    return (int)$conn->query("SELECT COUNT(*) FROM envois WHERE (gp_id = $user_id OR expediteur_id = $user_id)
+        AND statut IN (" . STATUTS_ENVOI_EN_COURS . ")")->fetch_row()[0];
+}
+
+function envois_en_cours_trajet(mysqli $conn, int $trajet_id): int
+{
+    return (int)$conn->query("SELECT COUNT(*) FROM envois WHERE trajet_id = $trajet_id
+        AND statut IN ('demande', " . STATUTS_ENVOI_EN_COURS . ")")->fetch_row()[0];
 }

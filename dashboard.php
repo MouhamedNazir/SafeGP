@@ -16,6 +16,12 @@ $user_id = $_SESSION['user_id'];
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['supprimer'])) {
     $id_trajet = (int)$_POST['supprimer'];
 
+    // Réservations en attente ou colis en cours sur ce trajet : on ne supprime pas
+    if (envois_en_cours_trajet($conn, $id_trajet) > 0) {
+        header("Location: dashboard.php?erreur=envois");
+        exit();
+    }
+
     $stmt = $conn->prepare("DELETE FROM trajets WHERE id = ? AND user_id = ?");
     $stmt->bind_param("ii", $id_trajet, $user_id);
     $stmt->execute();
@@ -52,6 +58,9 @@ $conn->close();
         <h2>Mes trajets</h2>
 
         <!-- Message de succès après suppression ou modification -->
+        <?php if (isset($_GET['erreur']) && $_GET['erreur'] == 'envois'): ?>
+            <p class="erreur"><i class="fa-solid fa-circle-xmark"></i> Ce trajet a des réservations ou des colis en cours : réponds aux demandes et termine les envois avant de le supprimer. <a href="envois.php">Mes envois</a></p>
+        <?php endif; ?>
         <?php if (isset($_GET['erreur']) && $_GET['erreur'] == 'kilos'): ?>
             <p class="erreur"><i class="fa-solid fa-circle-xmark" style="color:white;"></i> Les kilos restants doivent être entre 0 et la capacité totale.</p>
         <?php endif; ?>
