@@ -6,8 +6,28 @@
 # correct en ligne ; en local dans /SafeGP/, Apache garde sa page par défaut)
 ErrorDocument 404 /404.php
 
-# Fichiers internes jamais téléchargeables : scripts SQL, notes, journaux
-<FilesMatch "\.(sql|md|log|txt)$">
+# Fichiers et dossiers cachés (.git/, .gitignore, .env…) : on fait comme s'ils
+# n'existaient pas (404). Seul /.well-known/ reste accessible (certificats SSL).
+<IfModule mod_alias.c>
+    RedirectMatch 404 "/\.(?!well-known/)"
+    # Dossiers de travail qui n'ont rien à faire en ligne
+    RedirectMatch 404 "/(migrations|pubs|screenshots|docs)(/|$)"
+</IfModule>
+
+# Fichiers internes jamais téléchargeables : scripts SQL, notes, journaux,
+# archives et copies de sauvegarde
+<FilesMatch "\.(sql|md|log|txt|zip|rar|7z|bak|old|orig|sauvegarde|example|dist|ps1|sh|py)$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
+</FilesMatch>
+
+# Configuration : chargée par les pages PHP, jamais ouverte directement
+<FilesMatch "^config(\.example)?\.php$">
     <IfModule mod_authz_core.c>
         Require all denied
     </IfModule>
